@@ -1,23 +1,9 @@
 ﻿/**
- * F2 â€” NewsRow: einheitliche Listenzeile fÃ¼r KRITISCH und NORMAL.
- *
- * KRITISCH: roter Balken links, TL;DR-Zeile sichtbar, CVE/CVSS-Badges, Cluster-ZÃ¤hler.
- * NORMAL:   kompakte ~44px-Zeile, eine Zeile.
- * Gelesene Zeilen: ausgegraut.
- * Fokus-Ring in GEMA-Rot (Tastatur-Navigation F3).
- *
- * Props:
- *   article        â€“ Artikel-Objekt (inkl. is_priority, tldr, cve_ids, cvss, cluster_size, read_by)
- *   isNew          â€“ Bool: wurde nach letztem Besuch verÃ¶ffentlicht?
- *   isRead         â€“ Bool: vom aktuellen User gelesen?
- *   readBy         â€“ string[]: andere User die gelesen haben
- *   isFocused      â€“ Bool: tastatur-fokussiert (F3)
- *   selected       â€“ Bool: per Shift-Klick ausgewÃ¤hlt (F3 Bulk)
- *   onMarkRead     â€“ () => void
- *   onMarkUnread   â€“ () => void
- *   onSelect       â€“ (e: MouseEvent) => void (Shift-Klick)
- *   onSourceClick  â€“ (source: string) => void
- *   onTopicClick   â€“ (topic: string) => void
+ * K2/K1/K4/K6 — NewsRow: klassifizierte Triage-Zeile.
+ * K1: Rot NUR auf KRITISCH — 4px-Bar als news-row__bar-Element (kein border-left).
+ * K2: Kategorie- und Plattform-Chip auf jeder Zeile; TL;DR + Pillen inline auf KRITISCH.
+ * K4: Checkbox nur wenn selectMode=true. Kein Stub im Normalzustand.
+ * K6: read_by als Text; keine fetten 700er in NORMAL.
  */
 import { useState } from "react"
 import { platformLabel } from "../utils/platforms"
@@ -33,12 +19,13 @@ function formatAge(iso) {
   return new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "short" })
 }
 
-function initials(user) {
+// "anna.kraft@corp.de" -> "anna.k." | "akraft" -> "akraft"
+function shortUser(user) {
   if (!user || user === "anonymous") return null
-  const parts = user.split(/[.\s@]/).filter(Boolean)
-  return parts.length >= 2
-    ? (parts[0][0] + parts[1][0]).toUpperCase()
-    : user.slice(0, 2).toUpperCase()
+  const clean = user.replace(/@.*$/, "")
+  const parts = clean.split(/[.\-_]/).filter(Boolean)
+  if (parts.length >= 2) return `${parts[0]}.${parts[1][0]}.`
+  return clean.length > 12 ? clean.slice(0, 12) : clean
 }
 
 export default function NewsRow({
@@ -48,6 +35,7 @@ export default function NewsRow({
   readBy      = [],
   isFocused   = false,
   selected    = false,
+  selectMode  = false,
   onMarkRead,
   onMarkUnread,
   onSelect,
@@ -56,28 +44,26 @@ export default function NewsRow({
 }) {
   const [reasonOpen, setReasonOpen] = useState(false)
 
-  const cat     = article.category || "NORMAL"
-  const isKrit  = cat === "KRITISCH"
-  const plat    = article.platform ?? "cross"
-  const topics  = (article.topics || []).slice(0, 3)
-  const haloUrl = import.meta.env.VITE_HALO_TICKET_BASE_URL
+  const cat    = article.category || "NORMAL"
+  const isKrit = cat === "KRITISCH"
+  const plat   = article.platform ?? "cross"
+  const topics = (article.topics || []).slice(0, 3)
+  const haloUrl    = import.meta.env.VITE_HALO_TICKET_BASE_URL
   const ticketHref = haloUrl
     ? `${haloUrl}?summary=${encodeURIComponent(article.title)}&note=${encodeURIComponent(article.url ?? "")}`
     : null
-
-  const others = readBy.filter(u => u && u !== "anonymous")
+  const readers = (readBy || []).filter(u => u && u !== "anonymous")
 
   const rowCls = [
     "news-row",
-    isKrit                           ? "news-row--kritisch"  : "news-row--normal",
-    isRead                           ? "news-row--read"       : "",
-    isFocused                        ? "news-row--focused"    : "",
-    selected                         ? "news-row--selected"   : "",
-    article.is_priority && !isKrit   ? "news-row--priority"   : "",
+    isKrit    ? "news-row--kritisch" : "news-row--normal",
+    isRead    ? "news-row--read"     : "",
+    isFocused ? "news-row--focused"  : "",
+    selected  ? "news-row--selected" : "",
   ].filter(Boolean).join(" ")
 
   function handleCopy(e) {
-    e.preventDefault()
+    e.stopPropagation()
     navigator.clipboard?.writeText(article.url ?? "").catch(() => {})
   }
 
@@ -88,100 +74,104 @@ export default function NewsRow({
       onClick={onSelect}
       tabIndex={-1}
     >
-      {/* Selection indicator */}
-      <span className={`news-row__sel${selected ? " --checked" : ""}`} aria-hidden />
+      {/* K1: 4px Akzent-Balken — rot bei KRITISCH, transparent sonst */}
+      <span className="news-row__bar" aria-hidden />
 
-      {/* Platform badge */}
-      <span className={`badge--platform badge--${plat}`}>
-        {platformLabel(plat)}
-      </span>
+      {/* K4: Checkbox nur in selectMode */}
+      {selectMode && (
+        <span className={`news-row__sel${selected ? " --checked" : ""}`} aria-hidden />
+      )}
 
-      {/* New dot */}
-      {isNew && !isRead && <span className="dot--new" title="Neu seit letztem Besuch" />}
-
-      {/* Content column */}
+      {/* Content */}
       <div className="news-row__body">
-        {/* Title */}
-        <div className="news-row__title-row">
-          <a
-            className="news-row__title"
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-          >
-            {article.title}
-          </a>
+
+        {/* K2: Chip-Zeile */}
+        <div className="news-row__chips">
+          <span className={`cat-chip${isKrit ? " cat-chip--kritisch" : ""}`}>
+            {isKrit ? "Kritisch" : "Normal"}
+          </span>
+          <span className={`plat-chip plat-chip--${plat}`}>
+            {platformLabel(plat)}
+          </span>
+          {isNew && !isRead && <span className="new-chip">Neu</span>}
         </div>
 
-        {/* KRITISCH: TL;DR + badges */}
-        {isKrit && (
-          <>
-            {article.tldr && (
-              <p className="news-row__tldr">{article.tldr}</p>
-            )}
-            <div className="news-row__meta news-row__meta--badges">
-              {(article.cve_ids ?? []).slice(0, 3).map(cve => (
-                <span key={cve} className="badge--cve">{cve}</span>
-              ))}
-              {article.cvss != null && (
-                <span className={`badge--cvss${article.cvss >= 9 ? " badge--cvss-high" : ""}`}>
-                  CVSS {Number(article.cvss).toFixed(1)}
-                </span>
-              )}
-              {(article.cluster_size ?? 1) > 1 && (
-                <span className="badge--cluster">
-                  {article.cluster_size} Quellen
-                </span>
-              )}
-            </div>
-          </>
+        {/* Titel */}
+        <a
+          className="news-row__title"
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+        >
+          {article.title}
+        </a>
+
+        {/* K2: TL;DR mit KI-Tag — nur KRITISCH, inline */}
+        {isKrit && article.tldr && (
+          <p className="news-row__tldr">
+            <span className="ki-tag">KI</span>
+            {"\u203A "}
+            {article.tldr}
+          </p>
         )}
 
-        {/* Meta row */}
+        {/* K2: Meta-Pillen — nur KRITISCH */}
+        {isKrit && (
+          <div className="news-row__meta news-row__meta--badges">
+            {(article.cve_ids ?? []).slice(0, 3).map(cve => (
+              <span key={cve} className="badge--cve">{cve}</span>
+            ))}
+            {article.cvss != null && (
+              <span className={`badge--cvss${article.cvss >= 9 ? " badge--cvss-high" : ""}`}>
+                CVSS {Number(article.cvss).toFixed(1)}
+              </span>
+            )}
+            {(article.cluster_size ?? 1) > 1 && (
+              <span className="badge--cluster">
+                {article.cluster_size} Quellen
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Meta: Quelle · Topics · Alter · gelesen von */}
         <div className="news-row__meta">
           <button
             className="news-row__source"
-            onClick={(e) => { e.stopPropagation(); onSourceClick?.(article.source) }}
+            onClick={e => { e.stopPropagation(); onSourceClick?.(article.source) }}
             title={`Nur ${article.source} anzeigen`}
           >
             {article.source}
           </button>
-
-          {!isKrit && topics.map(t => (
+          {topics.map(t => (
             <button
               key={t}
               className="topic-chip"
-              onClick={(e) => { e.stopPropagation(); onTopicClick?.(t) }}
+              onClick={e => { e.stopPropagation(); onTopicClick?.(t) }}
             >
               {topicLabel(t)}
             </button>
           ))}
-
           <span className="news-row__age">{formatAge(article.published_at)}</span>
-
-          {/* Team read indicators */}
-          {others.length > 0 && (
-            <span className="news-row__readers" title={`Gelesen von: ${others.join(", ")}`}>
-              {others.slice(0, 3).map(u => (
-                <span key={u} className="avatar">{initials(u)}</span>
-              ))}
-              {others.length > 3 && (
-                <span className="avatar avatar--more">+{others.length - 3}</span>
-              )}
+          {readers.length > 0 && (
+            <span className="news-row__readers">
+              gelesen von{" "}
+              {readers.slice(0, 2).map(shortUser).filter(Boolean).join(", ")}
+              {readers.length > 2 && ` +${readers.length - 2}`}
             </span>
           )}
         </div>
 
-        {/* "Warum?" aufklappbar */}
+        {/* classification_reason: aufklappbar, kein Stub wenn leer */}
         {article.classification_reason && (
           <div className="news-row__reason">
             <button
               className="reason-toggle"
-              onClick={(e) => { e.stopPropagation(); setReasonOpen(o => !o) }}
+              onClick={e => { e.stopPropagation(); setReasonOpen(o => !o) }}
               aria-expanded={reasonOpen}
             >
-              {reasonOpen ? "Grund \u25b2" : "Grund \u25bc"}
+              {reasonOpen ? "Einblenden \u25b2" : "Warum? \u25bc"}
             </button>
             {reasonOpen && (
               <span className="reason-text">{article.classification_reason}</span>
@@ -190,14 +180,14 @@ export default function NewsRow({
         )}
       </div>
 
-      {/* Actions */}
+      {/* Aktionen */}
       <div className="news-row__actions" onClick={e => e.stopPropagation()}>
         <a
           href={article.url}
           target="_blank"
           rel="noopener noreferrer"
           className="action-btn"
-          title="Ã–ffnen (o)"
+          title="Öffnen (o)"
         >
           &#x2197;
         </a>
@@ -219,7 +209,7 @@ export default function NewsRow({
           </button>
         )}
         <button
-          className="action-btn action-btn--icon"
+          className="action-btn action-btn--hover"
           onClick={handleCopy}
           title="Link kopieren"
         >
@@ -230,7 +220,7 @@ export default function NewsRow({
             href={ticketHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="action-btn"
+            className="action-btn action-btn--hover"
             title="Ticket erstellen (t)"
           >
             T

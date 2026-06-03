@@ -1,9 +1,8 @@
 ﻿/**
- * F6 — Dashboard: Triage-UI für IT-Admin-Team.
- * Server-seitige Filter (view, platform, q, topic, source, page).
- * Tastatur-Triage j/k/o/e/u/t//, F3.
- * Team Read-State via useReadState (F4).
- * UI-Vorlieben (platform, view, darkMode) via useUIPrefs (F4).
+ * K3/K5/K4 — Dashboard: Triage-Board mit zwei Sektionen.
+ * K3: "Sofort prüfen" (KRITISCH) + "Übrige" (NORMAL) als getrennte Sektionen.
+ * K5: counts.all = total aus Hauptabfrage; fetchCounts mit collapse:true.
+ * K4: selectMode-Zustand; Checkboxen erst sichtbar wenn aktiv.
  */
 import { useCallback, useEffect, useRef, useState } from "react"
 import axios from "axios"
@@ -14,11 +13,8 @@ import { useReadState } from "../hooks/useReadState"
 
 const PAGE_SIZE    = 30
 const API_BASE     = "/api"
-const CURRENT_USER = "anonymous" // X-MS-CLIENT-PRINCIPAL-NAME is resolved server-side
+const CURRENT_USER = "anonymous"
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 function SkeletonRows() {
   return (
     <div className="skeleton-list">
@@ -40,30 +36,16 @@ function ErrorState({ message, onRetry }) {
   )
 }
 
-function EmptyState({ view }) {
-  if (view === "unread") return (
-    <div className="state">
-      <div className="state__icon">&#x1F389;</div>
-      <div className="state__title">Alles gelesen!</div>
-      <div className="state__msg">Nichts Neues — gut gemacht.</div>
-    </div>
-  )
-  return (
-    <div className="state">
-      <div className="state__icon">&#x1F50D;</div>
-      <div className="state__title">Keine Treffer</div>
-      <div className="state__msg">Filter oder Suche anpassen.</div>
-    </div>
-  )
-}
-
-// Aggregated per-platform counts (for PlatformSwitcher badges)
+// K5: collapse:true damit Zähler mit Hauptabfrage übereinstimmt
 async function fetchCounts(view) {
   const platforms = ["all", "windows", "apple", "android"]
   const results   = await Promise.allSettled(
     platforms.map(p =>
       axios.get(`${API_BASE}/news`, {
-        params: { view, page: 1, page_size: 1, ...(p !== "all" ? { platform: p } : {}) },
+        params: {
+          view, page: 1, page_size: 1, collapse: true,
+          ...(p !== "all" ? { platform: p } : {}),
+        },
       }).then(r => [p, r.data.total ?? 0])
     )
   )
@@ -74,49 +56,35 @@ async function fetchCounts(view) {
   return counts
 }
 
-// ---------------------------------------------------------------------------
-// Dashboard
-// ---------------------------------------------------------------------------
 export default function Dashboard({ onKritischCount }) {
   const { prefs, setPlatform, setView, touchVisit } = useUIPrefs()
   const { readMap, isRead, markRead, markUnread, markBulk, initReadMap } =
     useReadState(CURRENT_USER)
 
-  // Server state
-  const [items,    setItems]    = useState([])
-  const [total,    setTotal]    = useState(0)
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
-  const [counts,   setCounts]   = useState({ all: 0, windows: 0, apple: 0, android: 0 })
+  const [items,      setItems]      = useState([])
+  const [total,      setTotal]      = useState(0)
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState(null)
+  const [counts,     setCounts]     = useState({ all: 0, windows: 0, apple: 0, android: 0 })
+  const [q,          setQ]          = useState("")
+  const [topic,      setTopic]      = useState(null)
+  const [source,     setSource]     = useState(null)
+  const [page,       setPage]       = useState(1)
+  const [showDump,   setShowDump]   = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
 
-  // Filter state
-  const [q,        setQ]        = useState("")
-  const [topic,    setTopic]    = useState(null)
-  const [source,   setSource]   = useState(null)
-  const [page,     setPage]     = useState(1)
-  const [showDump, setShowDump] = useState(false)
-
-  // "neu seit letztem Besuch"
   const prevVisitRef = useRef(null)
-
-  // Keyboard focus (F3)
   const [focusIdx, setFocusIdx] = useState(-1)
   const [selected, setSelected] = useState(new Set())
   const listRef   = useRef(null)
   const searchRef = useRef(null)
   const seqRef    = useRef("")
 
-  // ---------------------------------------------------------------------------
-  // Mount: record visit
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     prevVisitRef.current = touchVisit()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ---------------------------------------------------------------------------
-  // Fetch articles
-  // ---------------------------------------------------------------------------
   const doFetch = useCallback(() => {
     setLoading(true)
     setError(null)
@@ -136,8 +104,11 @@ export default function Dashboard({ onKritischCount }) {
           ...a,
           topics: a.topics ?? [],
         }))
+        const fetchedTotal = res.data.total ?? 0
         setItems(articleItems)
-        setTotal(res.data.total ?? 0)
+        setTotal(fetchedTotal)
+        // K5: aktuelles Segment-Counts direkt aus Hauptabfrage
+        setCounts(prev => ({ ...prev, [prefs.platform]: fetchedTotal }))
         if (focusIdx < 0 && articleItems.length > 0) setFocusIdx(0)
         initReadMap(articleItems)
       })
@@ -149,30 +120,27 @@ export default function Dashboard({ onKritischCount }) {
   }, [prefs.view, prefs.platform, q, topic, source, page])
 
   useEffect(() => { doFetch() }, [doFetch])
-
-  // Reset page on filter/view change
   useEffect(() => { setPage(1) }, [prefs.view, prefs.platform, q, topic, source])
 
-  // Refresh platform counts
   useEffect(() => {
     fetchCounts(prefs.view).then(setCounts).catch(() => {})
   }, [prefs.view])
 
-  // Tab title + notify parent
   const kritischUnread = items.filter(a => a.category === "KRITISCH" && !isRead(a.id)).length
   useEffect(() => {
     document.title = kritischUnread > 0 ? `(${kritischUnread}) IT News` : "IT News"
     onKritischCount?.(kritischUnread)
   }, [kritischUnread, isRead, onKritischCount])
 
-  // Split: main vs dump
-  const mainItems = items.filter(a => a.category !== "DUMP" && a.category !== "OFF_TOPIC")
-  const dumpItems = items.filter(a => a.category === "DUMP" || a.category === "OFF_TOPIC")
-  const visibleItems = showDump ? items : mainItems
+  // K3: Sektionen
+  const mainItems    = items.filter(a => a.category !== "DUMP" && a.category !== "OFF_TOPIC")
+  const dumpItems    = items.filter(a => a.category === "DUMP"  || a.category === "OFF_TOPIC")
+  const kritischItems = mainItems.filter(a => a.category === "KRITISCH")
+  const normalItems   = mainItems.filter(a => a.category !== "KRITISCH")
+  // Reihenfolge muss DOM-Reihenfolge = focusIdx-Reihenfolge entsprechen
+  const visibleItems = showDump ? [...mainItems, ...dumpItems] : mainItems
 
-  // ---------------------------------------------------------------------------
-  // Keyboard shortcuts (F3)
-  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e) {
       const tag = document.activeElement?.tagName
@@ -206,12 +174,8 @@ export default function Dashboard({ onKritischCount }) {
           if (focused?.url) window.open(focused.url, "_blank", "noopener,noreferrer")
           break
         case "e":
-          if (selected.size > 0) {
-            markBulk(Array.from(selected))
-            setSelected(new Set())
-          } else if (focused) {
-            markRead(focused.id)
-          }
+          if (selected.size > 0) { markBulk(Array.from(selected)); setSelected(new Set()) }
+          else if (focused) markRead(focused.id)
           break
         case "u":
           if (focused) markUnread(focused.id)
@@ -219,11 +183,14 @@ export default function Dashboard({ onKritischCount }) {
         case "t":
           if (focused) {
             const haloUrl = import.meta.env.VITE_HALO_TICKET_BASE_URL
-            if (haloUrl) {
-              const href = `${haloUrl}?summary=${encodeURIComponent(focused.title)}&note=${encodeURIComponent(focused.url ?? "")}`
-              window.open(href, "_blank", "noopener,noreferrer")
-            }
+            if (haloUrl) window.open(
+              `${haloUrl}?summary=${encodeURIComponent(focused.title)}&note=${encodeURIComponent(focused.url ?? "")}`,
+              "_blank", "noopener,noreferrer"
+            )
           }
+          break
+        case "Escape":
+          if (selectMode) { setSelectMode(false); setSelected(new Set()) }
           break
         case "/":
           e.preventDefault()
@@ -236,9 +203,8 @@ export default function Dashboard({ onKritischCount }) {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusIdx, visibleItems, selected])
+  }, [focusIdx, visibleItems, selected, selectMode])
 
-  // Scroll focused row into view
   useEffect(() => {
     if (!listRef.current || focusIdx < 0) return
     listRef.current.querySelectorAll("[data-id]")[focusIdx]?.scrollIntoView({
@@ -246,12 +212,10 @@ export default function Dashboard({ onKritischCount }) {
     })
   }, [focusIdx])
 
-  // ---------------------------------------------------------------------------
-  // Bulk selection via Shift-click
-  // ---------------------------------------------------------------------------
   function handleRowSelect(idx, e) {
-    if (!e.shiftKey) return
+    if (!e.shiftKey && !selectMode) return
     e.preventDefault()
+    if (!selectMode) setSelectMode(true)
     const id = visibleItems[idx]?.id
     if (!id) return
     setSelected(prev => {
@@ -263,9 +227,26 @@ export default function Dashboard({ onKritischCount }) {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  function renderRow(a, idx) {
+    return (
+      <NewsRow
+        key={a.id}
+        article={a}
+        isNew={!!(prevVisitRef.current && (a.published_at ?? "") > prevVisitRef.current)}
+        isRead={isRead(a.id)}
+        readBy={readMap[a.id] ?? a.read_by ?? []}
+        isFocused={focusIdx === idx}
+        selected={selected.has(a.id)}
+        selectMode={selectMode}
+        onMarkRead={()   => markRead(a.id)}
+        onMarkUnread={()  => markUnread(a.id)}
+        onSelect={e      => handleRowSelect(idx, e)}
+        onSourceClick={s => { setSource(s); setPage(1) }}
+        onTopicClick={t  => { setTopic(t);  setPage(1) }}
+      />
+    )
+  }
+
   return (
     <div className="dashboard">
       <Topbar
@@ -288,46 +269,120 @@ export default function Dashboard({ onKritischCount }) {
         <span className="results-bar__count">
           {loading ? "\u2026" : `${total} Artikel`}
         </span>
-        {selected.size > 0 && (
+        {!selectMode && (
           <button
-            className="mark-all-btn"
-            onClick={() => { markBulk(Array.from(selected)); setSelected(new Set()) }}
+            className="results-bar__select-btn"
+            onClick={() => setSelectMode(true)}
           >
-            &#x2713; {selected.size} als gelesen
+            Auswählen
           </button>
         )}
-        {!loading && total > 0 && selected.size === 0 && prefs.view === "unread" && (
+        {selectMode && (
+          <>
+            <span className="results-bar__select-hint">
+              {selected.size > 0
+                ? `${selected.size} ausgewählt`
+                : "Shift+Klick zum Auswählen"}
+            </span>
+            {selected.size > 0 && (
+              <button
+                className="mark-all-btn"
+                onClick={() => { markBulk(Array.from(selected)); setSelected(new Set()) }}
+              >
+                &#x2713; {selected.size} gelesen
+              </button>
+            )}
+            <button
+              className="results-bar__cancel-btn"
+              onClick={() => { setSelectMode(false); setSelected(new Set()) }}
+            >
+              Abbrechen
+            </button>
+          </>
+        )}
+        {!loading && !selectMode && total > 0 && prefs.view === "unread" && (
           <button className="mark-all-btn" onClick={() => markBulk(items.map(a => a.id))}>
             Alle gelesen
           </button>
         )}
       </div>
 
-      {/* Article list */}
-      <div className="news-list" ref={listRef}>
+      {/* K3: Zwei Sektionen */}
+      <div ref={listRef}>
         {loading && <SkeletonRows />}
-        {!loading && error   && <ErrorState message={error} onRetry={doFetch} />}
-        {!loading && !error && visibleItems.length === 0 && <EmptyState view={prefs.view} />}
+        {!loading && error && <ErrorState message={error} onRetry={doFetch} />}
 
-        {!loading && !error && visibleItems.map((a, idx) => (
-          <NewsRow
-            key={a.id}
-            article={a}
-            isNew={!!(prevVisitRef.current && (a.published_at ?? "") > prevVisitRef.current)}
-            isRead={isRead(a.id)}
-            readBy={readMap[a.id] ?? a.read_by ?? []}
-            isFocused={focusIdx === idx}
-            selected={selected.has(a.id)}
-            onMarkRead={()   => markRead(a.id)}
-            onMarkUnread={()  => markUnread(a.id)}
-            onSelect={e      => handleRowSelect(idx, e)}
-            onSourceClick={s => { setSource(s); setPage(1) }}
-            onTopicClick={t  => { setTopic(t);  setPage(1) }}
-          />
-        ))}
+        {!loading && !error && (
+          <>
+            {/* Sektion 1: Sofort prüfen (KRITISCH) */}
+            <div className="triage-section">
+              <div className={`triage-section__head${kritischItems.length > 0 ? " triage-section__head--kritisch" : ""}`}>
+                <span className={`triage-dot${kritischItems.length > 0 ? " triage-dot--rot" : ""}`} />
+                <span>Sofort prüfen</span>
+                <span className={`triage-count${kritischItems.length > 0 ? " triage-count--rot" : ""}`}>
+                  {kritischItems.length}
+                </span>
+              </div>
+              {kritischItems.length === 0 ? (
+                <div className="triage-empty">Aktuell nichts Kritisches.</div>
+              ) : (
+                <div className="news-list">
+                  {kritischItems.map(a =>
+                    renderRow(a, visibleItems.indexOf(a))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Sektion 2: Übrige (NORMAL) */}
+            {normalItems.length > 0 && (
+              <div className="triage-section">
+                <div className="triage-section__head">
+                  <span className="triage-dot" />
+                  <span>Übrige</span>
+                  <span className="triage-count">
+                    {normalItems.length}
+                    {page < totalPages ? "+" : ""}
+                  </span>
+                </div>
+                <div className="news-list">
+                  {normalItems.map(a =>
+                    renderRow(a, visibleItems.indexOf(a))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* DUMP am Ende */}
+            {showDump && dumpItems.length > 0 && (
+              <div className="triage-section">
+                <div className="triage-section__head">
+                  <span className="triage-dot" />
+                  <span>Aussortiert</span>
+                  <span className="triage-count">{dumpItems.length}</span>
+                </div>
+                <div className="news-list">
+                  {dumpItems.map(a =>
+                    renderRow(a, visibleItems.indexOf(a))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Leer-State */}
+            {mainItems.length === 0 && dumpItems.length === 0 && (
+              <div className="state">
+                {prefs.view === "unread"
+                  ? <><div className="state__icon">&#x1F389;</div><div className="state__title">Alles gelesen!</div><div className="state__msg">Nichts Neues — gut gemacht.</div></>
+                  : <><div className="state__icon">&#x1F50D;</div><div className="state__title">Keine Treffer</div><div className="state__msg">Filter oder Suche anpassen.</div></>
+                }
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Dump toggle */}
+      {/* Dump-Toggle */}
       {!loading && !error && dumpItems.length > 0 && (
         <button
           className={`dump-toggle${showDump ? " dump-toggle--open" : ""}`}

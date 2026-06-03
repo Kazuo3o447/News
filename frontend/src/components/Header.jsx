@@ -39,7 +39,7 @@ export default function Header({ activePage, onNavigate, kritischUnread = 0, dar
             title={darkMode ? "Hell-Modus" : "Dunkel-Modus"}
             aria-label="Dark Mode umschalten"
           >
-            {darkMode ? "&#x2600;" : "&#x263D;"}
+            {darkMode ? "☀" : "☽"}
           </button>
         </div>
       </div>

@@ -1769,3 +1769,215 @@ button { font-family: inherit; }
    Legacy layout compat (remove old sidebar-based layout)
    ============================================================ */
 .layout { display: block; }
+
+/* ============================================================
+   Brief 04b — K1/K2/K3/K4/K6 Korrekturen
+   ============================================================ */
+
+/* K1: 4px Akzent-Balken als eigenes Element (kein border-left mehr) */
+/* Überschreibt die F5-Append-Regeln */
+.news-row--kritisch { border-left: none; padding-left: var(--s-3); }
+.news-row--priority  { border-left: none; padding-left: var(--s-3); }
+
+.news-row__bar {
+  display: block;
+  width: 4px;
+  min-width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.news-row--kritisch .news-row__bar { background: var(--gema-red); }
+
+/* K1: Fokus-Ring neutral (nicht rot) */
+.news-row--focused {
+  outline: 2px solid var(--gema-border);
+  outline-offset: -1px;
+  border-radius: var(--r-sm);
+}
+
+/* K2: Chip-Zeile */
+.news-row__chips {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+/* Kategorie-Chip */
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  background: var(--gema-bg-alt);
+  color: var(--gema-muted);
+  letter-spacing: 0.01em;
+}
+
+.cat-chip--kritisch {
+  background: var(--cat-kritisch-bg);
+  color: var(--cat-kritisch-strong);
+  font-weight: 600;
+}
+
+/* Plattform-Chip (ersetze badge--platform) */
+.plat-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  background: var(--gema-bg-alt);
+  color: var(--gema-muted);
+}
+
+.plat-chip--windows { background: var(--plat-windows-bg); color: var(--plat-windows); }
+.plat-chip--apple   { background: var(--plat-apple-bg);   color: var(--plat-apple);   }
+.plat-chip--android { background: var(--plat-android-bg); color: var(--plat-android); }
+.plat-chip--cross   { background: var(--gema-bg-alt);     color: var(--gema-muted);   }
+
+/* Neu-Chip */
+.new-chip {
+  display: inline-flex;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: var(--gema-red-soft);
+  color: var(--gema-red);
+}
+
+/* K2: KI-Tag vor TL;DR */
+.ki-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: var(--gema-red);
+  color: #fff;
+  margin-right: 4px;
+  vertical-align: middle;
+  line-height: 16px;
+}
+
+/* K6: Titel ohne fette 700er auf NORMAL */
+.news-row--normal .news-row__title { font-weight: 400; }
+.news-row--kritisch .news-row__title { font-weight: 600; font-size: var(--t-base); }
+
+/* K6: read_by als Text */
+.news-row__readers {
+  font-size: var(--t-xs);
+  color: var(--gema-subtle);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+/* K4: action-btn--hover nur on hover sichtbar */
+.action-btn--hover { opacity: 0; transition: opacity 0.15s; }
+.news-row:hover .action-btn--hover,
+.news-row--focused .action-btn--hover { opacity: 1; }
+
+/* K4: selectMode-relevante Buttons in results-bar */
+.results-bar__select-btn,
+.results-bar__cancel-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--gema-border);
+  border-radius: var(--r-md);
+  background: transparent;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  color: var(--gema-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.results-bar__select-btn:hover { border-color: var(--gema-text-soft); color: var(--gema-text); }
+.results-bar__cancel-btn:hover { border-color: var(--gema-red); color: var(--gema-red); }
+
+.results-bar__select-hint {
+  font-size: var(--t-xs);
+  color: var(--gema-muted);
+  font-style: italic;
+}
+
+/* K3: Triage-Sektionen */
+.triage-section {
+  margin-bottom: var(--s-5);
+}
+
+.triage-section__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) 0 var(--s-2);
+  border-bottom: 1px solid var(--gema-border);
+  margin-bottom: 0;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--gema-text-soft);
+}
+
+.triage-section__head--kritisch { color: var(--gema-text); }
+
+.triage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gema-border);
+  flex-shrink: 0;
+}
+
+.triage-dot--rot {
+  background: var(--gema-red);
+  box-shadow: 0 0 0 3px rgba(226, 0, 26, 0.15);
+}
+
+.triage-count {
+  margin-left: auto;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--gema-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.triage-count--rot {
+  color: var(--gema-red);
+  background: var(--cat-kritisch-bg);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+.triage-empty {
+  padding: var(--s-4) var(--s-3);
+  font-size: var(--t-sm);
+  color: var(--gema-subtle);
+  background: var(--gema-surface);
+  border: 1px solid var(--gema-border);
+  border-radius: var(--r-md);
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* Dark mode für neue Elemente */
+[data-theme="dark"] .ki-tag { background: var(--gema-red); }
+[data-theme="dark"] .cat-chip--kritisch { background: #2D0D10; }
+
+/* Mobile */
+@media (max-width: 640px) {
+  .action-btn--hover { opacity: 1; }
+  .news-row__readers { display: none; }
+}
