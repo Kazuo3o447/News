@@ -1,6 +1,6 @@
 # Agent — Groq KI-Klassifizierung
 
-> Groq API · Modell: `openai/gpt-oss-120b` · Stand: Juni 2026 (Copilot-Brief 01)
+> Groq API · Modell: `openai/gpt-oss-120b` · Stand: Juni 2026 (Copilot-Brief 02)
 
 ---
 
@@ -19,6 +19,7 @@ Der Groq-Agent analysiert Headline + Beschreibung jedes eingehenden RSS-Artikels
 | `KRITISCH` | 🔴 | Sofortiger Handlungsbedarf auf **irgendeiner** Plattform |
 | `NORMAL` | 🔵 | Admin-relevant, kein Sofortbedarf |
 | `DUMP` | ⚫ | Kein Admin-Wert — plattformunabhängig (Consumer-Reviews, Gaming, Deals …) |
+| `OFF_TOPIC` | 🌫 | Pre-Filter-Treffer — kein LLM-Call (Denylist oder kein IT-Topic-Keyword) |
 
 > **DUMP ist plattformunabhängig.** Ein Apple-Artikel ist NICHT DUMP weil er Apple betrifft.
 > Er ist DUMP wenn er keinen Admin-Wert hat (z. B. „iPhone 17 Testbericht").
@@ -27,8 +28,10 @@ Der Groq-Agent analysiert Headline + Beschreibung jedes eingehenden RSS-Artikels
 
 | Stufe | Was passiert |
 |---|---|
-| **Pre-Filter** | Denylist-Treffer → sofort `OFF_TOPIC`, kein LLM-Call |
-| **Regelschicht** | CVE / aktiver Exploit / Advisory-Quelle → `forced_critical=True` |
+| **Pre-Filter** | Denylist-Treffer oder kein IT-Topic-Keyword → sofort `OFF_TOPIC`, kein LLM-Call |
+| **Regelschicht** | CVE / aktiver Exploit / Advisory-Quelle → `forced_critical=True`; Confidence = `1.0` |
+
+> **Confidence wird im Frontend nicht mehr angezeigt** (seit Brief 02). Der Wert ist im Datenmodell als `null` gespeichert und dient intern nur noch als Debug-Hinweis.
 
 ---
 

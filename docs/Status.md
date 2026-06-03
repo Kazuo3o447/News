@@ -1,6 +1,6 @@
 # Projektstatus — IT News Hub
 
-> Letzte Aktualisierung: Juni 2026 (Copilot-Brief 01 — Cross-Platform-Umbau)
+> Letzte Aktualisierung: Juni 2026 (Copilot-Brief 02 — Frontend & UX)
 
 ---
 
@@ -8,8 +8,8 @@
 
 ```
 Infrastruktur  ████░░░░░░  40 %
-Backend        █████████░  85 %
-Frontend       █████░░░░░  55 %
+Backend        █████████░  90 %
+Frontend       ████████░░  80 %
 KI / Groq      █████████░  90 %
 Deployment     ░░░░░░░░░░   0 %
 ```
@@ -63,18 +63,34 @@ Deployment     ░░░░░░░░░░   0 %
 
 ---
 
-## Phase 3 — Frontend 🔲 Ausstehend
+## Copilot-Brief 02 — Frontend & UX ✅ Abgeschlossen (Juni 2026)
 
-- [ ] Vite + React Projekt initialisiert
-- [ ] GEMA Farbthema in CSS Custom Properties umgesetzt
-- [ ] `Header` Komponente erstellt
-- [ ] `NewsCard` Komponente erstellt (mit Kategorie-Badge)
-- [ ] `FilterBar` Komponente erstellt (KRITISCH / NORMAL / DUMP)
-- [ ] `Dashboard` Seite implementiert
-- [ ] `Settings` Seite (Feed-Verwaltung) implementiert
-- [ ] Responsives Layout umgesetzt
-- [ ] API-Anbindung (Axios) implementiert
-- [ ] Loading/Error-States implementiert
+- [x] **F1** `hooks/usePrefs.js`: `selectedPlatform`, `readIds` (Set O(1)), `lastVisitAt`; neue Aktionen `setSelectedPlatform`, `markRead`, `markAllRead`, `isRead`, `touchVisit`; Migration aus v1-Key (`itnews.prefs.v1` → `itnews.prefs.v2`)
+- [x] **F2** `components/PlatformSwitcher.jsx` **NEU**: Segmented Control (🌐 Alle | 🪟 Windows | Apple | Android); GEMA-Rot aktiv; Artikelzahl pro Segment (eigene + cross); mobil umbrechen
+- [x] **F3** `pages/Dashboard.jsx` — Logik: Plattform-Filter (platform === sel || cross), KRITISCH-First-Sortierung, `touchVisit()` beim Mount, Neu/Kritisch-Stats im Header, „Alle gelesen"-Button
+- [x] **F4** `pages/Dashboard.jsx` — Layout: Sektion A „Sofort prüfen (N)" als `NewsCard`-Grid; Sektion B „Übrige" als `NewsRow`-Liste (paginiert 30/Seite); leere-Kritisch-Hinweis
+- [x] **F5** `components/NewsCard.jsx`: Confidence-% entfernt; Plattform-Badge; `classification_reason` als Tooltip; `isNew`-Indikator; Aktionszeile (Öffnen / Gelesen / Kopieren / Ticket-Stub); gelesene Karten ausgegraut
+- [x] **F5** `components/NewsRow.jsx` **NEU**: Kompakte ~48px-Flex-Zeile (Plattform-Icon · isNew-Dot · Titel · Quelle · Zeit · Aktionen); Hover-only Aktionen
+- [x] **F6** `components/FilterSidebar.jsx`: Plattform-Panel (Single-Select); Topics via `GET /api/topics` (Fallback utils/topics.js); „Dump (Werbung)" → „Aussortiert anzeigen"; OFF_TOPIC-Zweig aktiv
+- [x] **F7** `styles/theme.css`: Plattform-Farbtoken (`--plat-windows/apple/android/cross` + `-bg`); Klassen `.platform-switcher`, `.badge--platform`, `.dot--new`, `.badge--new`, `.section-head`, `.news-rows`/`.news-row`, `.action-btn`, `.mark-all-btn`
+
+---
+
+## Phase 3 — Frontend ✅ Abgeschlossen
+
+- [x] Vite + React Projekt initialisiert
+- [x] GEMA Farbthema in CSS Custom Properties umgesetzt (GEMA-Rot `#E2001A` als einzige Signalfarbe)
+- [x] `Header` Komponente erstellt
+- [x] `NewsCard` Komponente erstellt (Kategorie-Badge, Plattform-Badge, Aktionszeile)
+- [x] `NewsRow` Komponente erstellt (kompakte Listenzeile für Übrige-Sektion)
+- [x] `PlatformSwitcher` Komponente erstellt (segmentierte Steuerung)
+- [x] `FilterSidebar` Komponente erstellt (Plattform, Themen, Kritikalität, Quelle)
+- [x] `Dashboard` Seite implementiert (Zwei-Ebenen-Layout: Kritisch-Karten / Übrige-Liste)
+- [x] `Settings` Seite implementiert (Themen-Abos, Quellen-Mute, Reset)
+- [x] Responsives Layout umgesetzt
+- [x] API-Anbindung (Axios) implementiert; Topics aus `GET /api/topics`
+- [x] Loading/Error-States implementiert
+- [x] localStorage-Persistenz: Plattform-Stack, gelesen/ungelesen, letzter Besuch (`itnews.prefs.v2`)
 
 ---
 
@@ -119,6 +135,7 @@ Deployment     ░░░░░░░░░░   0 %
 | # | Beschreibung | Priorität | Status |
 |---|---|---|---|
 | — | Keine offenen Blocker | — | — |
+| 1 | Groq-API-Key nicht gesetzt → alle Artikel `OFF_TOPIC` (kein LLM-Call) | Niedrig | Offen — `.env` lokal befüllen |
 
 ---
 
@@ -134,13 +151,17 @@ Deployment     ░░░░░░░░░░   0 %
 | Juni 2026 | Cross-Platform statt Microsoft-only | Windows + Apple + Android gleichwertig; Copilot-Brief 01 |
 | Juni 2026 | Confidence deterministisch (nicht vom LLM) | `1.0` forced_critical / `0.9` match / `0.6` mismatch — reproduzierbar |
 | Juni 2026 | Rule-Classifier vor LLM | CVE/CVSS/aktiver Exploit zuverlässiger per Regex als per LLM |
+| Juni 2026 | Kein Tailwind / keine UI-Library | GEMA-Rot als einzige Signalfarbe; saubere CSS Custom Properties in theme.css |
+| Juni 2026 | `DUMP` → „Aussortiert" (UI-Begriff) | „Werbung" war zu eng; DUMP = plattformunabhängiges Rauschen (Consumer, Deals, Gerüchte) |
+| Juni 2026 | Zwei-Ebenen-Layout (Karten + Listenzeilen) | KRITISCH muss schreien; 200 NORMAL-Karten kosten zu viel Scroll |
+| Juni 2026 | localStorage `readIds` als Set | O(1)-Lookup für `isRead(id)`; als Array persistiert (JSON-kompatibel) |
 
 ---
 
 ## Nächste Schritte
 
-1. Frontend: Platform-Filter und Plattform-Badges in `FilterSidebar.jsx` + `NewsCard.jsx` integrieren
-2. Frontend: `GET /api/platforms` und `GET /api/topics` konsumieren (statt hard-coded Listen)
-3. Azure: Infrastruktur provisionieren (`infrastructure/main.bicep`)
-4. CI/CD: GitHub Actions für Backend (pytest + ruff) und Frontend (build) einrichten
-5. Deployment: Erstes Deployment auf Azure App Service + Static Web Apps
+1. Azure: Infrastruktur provisionieren (`infrastructure/main.bicep`)
+2. CI/CD: GitHub Actions für Backend (pytest + ruff) und Frontend (build) einrichten
+3. Deployment: Erstes Deployment auf Azure App Service + Static Web Apps
+4. Backend: server-seitigen Plattform-/Kategorie-Filter in `GET /api/news` schärfen (statt page_size=500 + Client-Filter)
+5. Frontend: `GET /api/platforms` im PlatformSwitcher konsumieren (derzeit hardcodiert)

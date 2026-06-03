@@ -1,6 +1,6 @@
 # Manifest — IT News Hub
 
-> Version: 0.1.0 · Stand: Mai 2026 · Autor: Projektteam
+> Version: 0.2.0 · Stand: Juni 2026 · Autor: Projektteam
 
 ---
 
@@ -17,9 +17,10 @@ sofort sichtbar ist.
 
 | Stufe | Bedeutung | Farbe |
 |---|---|---|
-| 🔴 **KRITISCH** | Sicherheitslücken, Outages, Zero-Days, kritische Patches | `#CC2200` |
+| 🔴 **KRITISCH** | Sicherheitslücken, Outages, Zero-Days, kritische Patches | `#E2001A` (GEMA-Rot) |
 | 🔵 **NORMAL** | Produktneuheiten, Branchen-News, technische Artikel | `#0052A5` |
-| ⚫ **DUMP** | Werbung, Sponsored Content, Click-Bait, Deals | `#A0AEC0` |
+| ⚫ **DUMP / Aussortiert** | Plattformunabhängiges Rauschen: Consumer-Reviews, Deals, Gerüchte ohne Admin-Wert | `#A0AEC0` |
+| 🌫 **OFF_TOPIC** | Pre-Filter: kein IT-Admin-Bezug erkannt (kein LLM-Call) | `#CBD5E0` |
 
 ---
 
@@ -132,9 +133,9 @@ sofort sichtbar ist.
 | Komponente | Technologie | Begründung |
 |---|---|---|
 | Framework | React 18 + Vite | Schnell, modernes Ökosystem |
-| Styling | CSS Custom Properties | GEMA-Farbthema, kein Framework-Overhead |
+| Styling | CSS Custom Properties | GEMA-Farbthema, kein Framework-Overhead; GEMA-Rot als einzige Signalfarbe |
 | HTTP-Client | Axios | Einfach, weit verbreitet |
-| State | Zustand (Zustand.js) | Leichtgewichtig für diesen Use-Case |
+| State | `usePrefs` (localStorage) | Kein externem Store nötig; Key `itnews.prefs.v2` |
 
 ### Azure-Infrastruktur
 
@@ -152,9 +153,12 @@ sofort sichtbar ist.
 
 | Methode | Pfad | Beschreibung |
 |---|---|---|
-| `GET` | `/api/news` | Alle Artikel (filter: `category`, `platform`, `topic`) |
+| `GET` | `/api/news` | Alle Artikel (filter: `category`, `platform`, `topic`; paginiert) |
 | `GET` | `/api/news/{id}` | Einzelner Artikel |
 | `POST` | `/api/refresh` | Manuelle Feed-Aktualisierung (`X-Refresh-Secret` Header) |
+| `POST` | `/api/reclassify` | Alle PENDING-Artikel per Groq neu klassifizieren |
+| `GET` | `/api/feeds` | Konfigurierte Feed-URLs und Plattform-Zuordnung |
+| `GET` | `/api/feeds/health` | Letzter Fetch-Status pro Feed |
 | `GET` | `/api/health` | Health-Check Endpunkt |
 | `GET` | `/api/topics` | Klassifizierungsthemen als `{key, label}`-Liste |
 | `GET` | `/api/platforms` | Plattformen als `{key, label}`-Liste |
@@ -174,9 +178,15 @@ sofort sichtbar ist.
   "fetched_at": "2026-06-03T10:35:00Z",
   "category": "KRITISCH",
   "platform": "windows",
-  "confidence": 0.9,
+  "confidence": null,
   "classification_reason": "CVE + aktive Exploitierung erkannt",
-  "tags": ["security", "windows", "cve", "patch"]
+  "tags": ["security", "windows", "cve", "patch"],
+  "topics": ["security"],
+  "cve_ids": ["CVE-2026-12345"],
+  "cvss": 9.8,
+  "cluster_id": "abc123def456",
+  "prompt_version": "2025-06-01",
+  "tldr": ""
 }
 ```
 
@@ -186,6 +196,7 @@ sofort sichtbar ist.
 
 ```css
 /* GEMA Corporate Colors */
+--gema-red:       #E2001A;   /* Primär Rot — einzige Signalfarbe */
 --gema-navy:      #003366;   /* Primär dunkelblau */
 --gema-blue:      #0052A5;   /* Primär blau */
 --gema-cyan:      #4DA6E0;   /* Akzent hellblau */
@@ -195,9 +206,15 @@ sofort sichtbar ist.
 --gema-muted:     #4A5568;   /* Sekundärtext */
 
 /* Klassifizierungs-Farben */
---cat-critical:   #CC2200;   /* KRITISCH – Rot */
+--cat-kritisch:   #E2001A;   /* KRITISCH – GEMA-Rot */
 --cat-normal:     #0052A5;   /* NORMAL – Blau */
---cat-dump:       #A0AEC0;   /* DUMP – Grau */
+--cat-dump:       #A0AEC0;   /* DUMP/Aussortiert – Grau */
+
+/* Plattform-Farben (gedeckt; Rot bleibt dominant) */
+--plat-windows:   #2563EB;   --plat-windows-bg: #EAF1FF;
+--plat-apple:     #444448;   --plat-apple-bg:   #F0F0F2;
+--plat-android:   #2E9E5B;   --plat-android-bg: #E9F7EF;
+--plat-cross:     #6E6E73;   --plat-cross-bg:   #F1F1F3;
 ```
 
 ---
