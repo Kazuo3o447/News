@@ -1,6 +1,6 @@
 # Manifest — IT News Hub
 
-> Version: 0.2.0 · Stand: Juni 2026 · Autor: Projektteam
+> Version: 0.3.0 · Stand: Juni 2026 · Autor: Projektteam
 
 ---
 
@@ -135,7 +135,8 @@ sofort sichtbar ist.
 | Framework | React 18 + Vite | Schnell, modernes Ökosystem |
 | Styling | CSS Custom Properties | GEMA-Farbthema, kein Framework-Overhead; GEMA-Rot als einzige Signalfarbe |
 | HTTP-Client | Axios | Einfach, weit verbreitet |
-| State | `usePrefs` (localStorage) | Kein externem Store nötig; Key `itnews.prefs.v2` |
+| State | `useUIPrefs` (localStorage) | Kein externer Store nötig; Key `itnews.ui.v4` (platform, view, darkMode, lastVisitAt) |
+| Read-State | `useReadState` | Server-basierter Team-Read-State; optimistische Updates; `reads`-Cosmos-Container |
 
 ### Azure-Infrastruktur
 
@@ -158,6 +159,28 @@ sofort sichtbar ist.
 | `POST` | `/api/refresh` | Manuelle Feed-Aktualisierung (`X-Refresh-Secret` Header) |
 | `POST` | `/api/reclassify` | Alle PENDING-Artikel per Groq neu klassifizieren |
 | `GET` | `/api/feeds` | Konfigurierte Feed-URLs und Plattform-Zuordnung |
+| `POST` | `/api/articles/{id}/read` | Artikel als gelesen markieren (User via `X-User`-Header) |
+| `DELETE` | `/api/articles/{id}/read` | Gelesen-Status zurücksetzen |
+| `POST` | `/api/articles/read/bulk` | Bis zu 500 Artikel auf einmal als gelesen markieren |
+| `GET` | `/api/topics` | Alle vorhandenen Topic-Labels |
+| `GET` | `/api/platforms` | Alle Platform-Werte mit Labels |
+
+---
+
+## 7. Frontend-Komponenten
+
+| Datei | Beschreibung |
+|---|---|
+| `components/Header.jsx` | Appeleiste: Logo, Dark-Mode-Toggle (☀/☽), kritischUnread-Pill |
+| `components/Topbar.jsx` | PlatformSwitcher · Suchfeld · View-Toggle · Filter-Chips |
+| `components/PlatformSwitcher.jsx` | Text-only Tabs (Microsoft / Apple / Android / Alle) mit Unread-Counts |
+| `components/NewsRow.jsx` | Triage-Zeile: 4px-Bar (rot=KRITISCH), Chips, TL;DR, CVE/CVSS-Pillen, Aktionen |
+| `hooks/useUIPrefs.js` | localStorage `itnews.ui.v4`; Plattform/View/DarkMode/LastVisitAt |
+| `hooks/useReadState.js` | Server-Read-State; markRead/markUnread/markBulk; optimistische Updates |
+| `utils/platforms.js` | `PLATFORMS`, `platformLabel()`, `PLATFORM_LABEL` |
+| `utils/topics.js` | `topicLabel()` |
+| `pages/Dashboard.jsx` | Triage-Board: „Sofort prüfen" (KRITISCH) + „Übrige" (NORMAL), Keyboard-Nav, SelectMode |
+| `pages/Settings.jsx` | Einstellungen (Themen-Abos, Quellen-Mute) |
 | `GET` | `/api/feeds/health` | Letzter Fetch-Status pro Feed |
 | `GET` | `/api/health` | Health-Check Endpunkt |
 | `GET` | `/api/topics` | Klassifizierungsthemen als `{key, label}`-Liste |

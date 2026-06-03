@@ -1,6 +1,6 @@
 # Projektstatus — IT News Hub
 
-> Letzte Aktualisierung: Juni 2026 (Copilot-Brief 03 — Backend, Daten & KI)
+> Letzte Aktualisierung: Juni 2026 (Copilot-Brief 04b — Triage-UI Korrekturen)
 
 ---
 
@@ -9,10 +9,34 @@
 ```
 Infrastruktur  ████░░░░░░  40 %
 Backend        ██████████ 100 %
-Frontend       ████████░░  80 %
+Frontend       █████████░  96 %
 KI / Groq      ██████████ 100 %
 Deployment     ░░░░░░░░░░   0 %
 ```
+
+---
+
+## Copilot-Brief 04b — Triage-UI Korrekturen ✅ Abgeschlossen (Juni 2026)
+
+- [x] **K1** `components/NewsRow.jsx`: Rotes Akzent-Element `news-row__bar` (4px-Span) ersetzt `border-left`; rot **nur** auf `.news-row--kritisch`, transparent auf NORMAL; `.news-row--priority` border-left entfernt; Fokus-Ring neutral (kein Rot)
+- [x] **K2** `components/NewsRow.jsx`: `cat-chip` (Kritisch/Normal) + `plat-chip` auf **jeder** Zeile; TL;DR mit rotem `ki-tag`-Badge inline auf KRITISCH ohne Klick; CVE/CVSS/Quellen-Pillen direkt sichtbar auf KRITISCH; `classification_reason` bleibt kollapsierbar („Warum? ▼") — kein leerer Stub
+- [x] **K3** `pages/Dashboard.jsx`: Zwei feste Sektionen — „● Sofort prüfen · {n}" (KRITISCH, roter Punkt) und „⌷ Übrige · {n}" (NORMAL, neutral); leere KRITISCH-Sektion zeigt „Aktuell nichts Kritisches."; Keyboard-Nav (`j/k`) traversiert beide Sektionen via `querySelectorAll("[data-id]")`
+- [x] **K4** `pages/Dashboard.jsx` + `NewsRow.jsx`: `selectMode`-State in Dashboard; „Auswählen"-Button in results-bar; Checkboxen in NewsRow nur wenn `selectMode=true`; Shift+Klick aktiviert selectMode automatisch; Kopieren- + Ticket-Buttons als `.action-btn--hover` (opacity 0, bei Hover sichtbar)
+- [x] **K5** `pages/Dashboard.jsx`: `fetchCounts` übergibt `collapse: true`; nach jedem Haupt-Fetch `setCounts(prev => ({ ...prev, [platform]: total }))` → „Alle N"-Switcher-Badge == „N Artikel"-Resultsbar; Zähler-Diskrepanz behoben
+- [x] **K6** `components/NewsRow.jsx`: `read_by` als Text „gelesen von anna.k." via `shortUser()`; keine Avatar-Kreise mehr; NORMAL-Titelzeile `font-weight: 400`; `.news-row--priority` Blau-Balken entfernt
+- [x] **K1–K6** `styles/theme.css`: CSS-Overrides für alle neuen Klassen ergänzt — `.news-row__bar`, `.cat-chip`, `.plat-chip`, `.new-chip`, `.ki-tag`, `.triage-section`, `.triage-section__head`, `.triage-dot`, `.triage-count`, `.triage-empty`, `.action-btn--hover`, `.results-bar__select-btn`
+
+---
+
+## Copilot-Brief 04 — Frontend-Redesign: Triage-UI ✅ Abgeschlossen (Juni 2026)
+
+- [x] **F0** Zustand-Dependency entfernt; `utils/platforms.js` **NEU**: `PLATFORMS`-Array, `platformLabel()`, `PLATFORM_LABEL`-Map
+- [x] **F1** `components/Topbar.jsx` **NEU**: PlatformSwitcher · Suchfeld · View-Toggle (Ungelesen/Alle) · Filter-Chips (Topic, Quelle); `components/PlatformSwitcher.jsx` überarbeitet — Label „Microsoft" statt „Windows", Text-only, Unread-Count-Badges
+- [x] **F2** `components/NewsRow.jsx` komplett neu: ~48px-Flex-Zeile mit Plattform-Icon, isNew-Punkt, Titel, Quelle, Alter, Aktionszeile; server-basierter Read-State
+- [x] **F3** `pages/Dashboard.jsx`: Keyboard-Navigation (j/k, o, e, u, t, /, g+u, g+a); Shift+Klick Multi-Select; focusIdx scrollt in View
+- [x] **F4** `hooks/useReadState.js` **NEU**: Server-basierter Team-Read-State, optimistische Updates; `hooks/useUIPrefs.js` **NEU**: localStorage `itnews.ui.v4` (platform, view, darkMode, lastVisitAt)
+- [x] **F5** `components/Header.jsx` überarbeitet: Dark-Mode-Toggle (☀/☽), kritischUnread-Pill, Höhe 52px; `styles/theme.css`: Dark-Mode-Token, Mobile-Breakpoints
+- [x] **F6** `pages/Dashboard.jsx` komplett neu: Flache Liste mit Paginierung, Dump-Toggle, Skeleton-Loader, Error-State, Zähler-Badges
 
 ---
 

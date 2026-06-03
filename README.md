@@ -54,9 +54,11 @@ News/
 │   ├── config/             # Einstellungen, Feed-Liste
 │   └── main.py
 ├── frontend/               # React + Vite
-│   ├── src/components/     # NewsCard, FilterBar, Header
-│   ├── src/pages/          # Dashboard, Settings
-│   └── src/styles/         # GEMA Farbthema
+│   ├── src/components/     # Header, Topbar, PlatformSwitcher, NewsRow
+│   ├── src/hooks/          # useUIPrefs, useReadState
+│   ├── src/pages/          # Dashboard (Triage-Board), Settings
+│   ├── src/utils/          # platforms.js, topics.js
+│   └── src/styles/         # GEMA Farbthema (theme.css)
 ├── infrastructure/         # Azure Bicep IaC
 ├── docs/                   # Projektdokumentation
 └── .github/workflows/      # CI/CD Pipeline
@@ -64,4 +66,17 @@ News/
 
 ---
 
-> Farbschema: GEMA Corporate Identity — Navy `#003366` · Blau `#0052A5` · Cyan `#4DA6E0`
+## Aktueller Stand
+
+| Brief | Beschreibung | Status |
+|---|---|---|
+| Brief 01 | Backend & KI-Pipeline | ✅ Abgeschlossen |
+| Brief 02 | Frontend Grundgerüst | ✅ Abgeschlossen |
+| Brief 03 | Backend, Daten & KI (Erweiterung) | ✅ Abgeschlossen |
+| Brief 04 | Frontend-Redesign: Triage-UI | ✅ Abgeschlossen |
+| Brief 04b | Triage-UI Korrekturen (K1–K6) | ✅ Abgeschlossen |
+| Brief 05 | Azure Deployment | 🔲 Ausstehend |
+
+---
+
+> Farbschema: GEMA Corporate Identity — Navy `#003366` · Blau `#0052A5` · GEMA-Rot `#E2001A` als einzige Signalfarbe
