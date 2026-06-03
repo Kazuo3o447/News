@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.cache/
+*.local
+
+# Azure
+*.pubxml
+.azure/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+
+# Secrets
+*.pem
+*.key
+secrets/
+
+# Logs
+*.log
+logs/
