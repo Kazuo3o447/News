@@ -88,9 +88,14 @@ def fetch_feed(feed_cfg: dict) -> list[dict]:
         return []
 
 
-def fetch_all_feeds() -> list[dict]:
-    """Fetcht alle konfigurierten Feeds und gibt kombinierte Artikel zurück."""
+def fetch_all_feeds(priorities: set[str] | None = None) -> list[dict]:
+    """
+    Fetcht alle konfigurierten Feeds und gibt kombinierte Artikel zurück.
+    B3: priorities-Filter (z.B. {"high"}) für Tiered Polling.
+    """
     all_articles = []
     for feed_cfg in FEEDS:
+        if priorities is not None and feed_cfg.get("priority", "medium") not in priorities:
+            continue
         all_articles.extend(fetch_feed(feed_cfg))
     return all_articles

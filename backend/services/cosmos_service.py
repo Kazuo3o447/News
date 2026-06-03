@@ -138,27 +138,66 @@ def get_articles(
     page: int = 1,
     page_size: int = 20,
     collapse: bool = False,
+    # B1 — neue Filter
+    view: str | None = None,       # "all" | "unread" | "critical"
+    q: str | None = None,          # Freitext (title + summary + source)
+    topic: str | None = None,      # Topic-Key
+    source: str | None = None,     # Quellenname
+    since: str | None = None,      # ISO-8601 — nur Artikel neuer als dieser Zeitstempel
+    user: str | None = None,       # aktueller User (für view=unread / is_read Anreicherung)
+    read_map_fn=None,              # injiziertes read_state.read_map (Circular-Import-Schutz)
 ) -> tuple[list[Article], int]:
     """
     Gibt paginierte Artikel zurück.
     collapse=True: Pro cluster_id nur den Repräsentanten zurückgeben.
-    SICHERHEIT: category und platform gegen erlaubte Enum-Werte validiert.
+    SICHERHEIT: Alle Filterwerte validiert/parametrisiert — keine SQL-Injection.
     """
     if category is not None and category not in _VALID_CATEGORIES:
         raise ValueError(f"Ungültige Kategorie: {category!r}")
     if platform is not None and platform not in _VALID_PLATFORMS:
         raise ValueError(f"Ungültige Plattform: {platform!r}")
 
+    page_size = min(page_size, 60)  # B1: hart auf 60 deckeln
+
+    # view shortcut
+    if view == "critical":
+        category = "KRITISCH"
+
     if _use_cosmos():
-        conditions = []
+        # --- Parametrisierte Cosmos-Query ---
+        conditions: list[str] = []
+        params: list[dict] = []
+
         if category:
-            conditions.append(f"c.category = '{category}'")
+            conditions.append("c.category = @category")
+            params.append({"name": "@category", "value": category})
         if platform:
-            conditions.append(f"c.platform = '{platform}'")
+            conditions.append("(c.platform = @platform OR c.platform = 'cross')")
+            params.append({"name": "@platform", "value": platform})
+        if q:
+            q_lower = q.lower()
+            conditions.append(
+                "CONTAINS(LOWER(c.title), @q) OR CONTAINS(LOWER(c.summary), @q) OR CONTAINS(LOWER(c.source), @q)"
+            )
+            params.append({"name": "@q", "value": q_lower})
+        if topic:
+            conditions.append("ARRAY_CONTAINS(c.topics, @topic)")
+            params.append({"name": "@topic", "value": topic})
+        if source:
+            conditions.append("c.source = @source")
+            params.append({"name": "@source", "value": source})
+        if since:
+            conditions.append("(c.published_at > @since OR c.fetched_at > @since)")
+            params.append({"name": "@since", "value": since})
+
         where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         items_query = f"SELECT * FROM c {where}"
         try:
-            raw_items = list(_get_container().query_items(items_query, enable_cross_partition_query=True))
+            raw_items = list(_get_container().query_items(
+                items_query,
+                parameters=params if params else None,
+                enable_cross_partition_query=True,
+            ))
         except Exception as exc:
             logger.error("Cosmos get_articles failed: %s", exc)
             return [], 0
@@ -168,22 +207,53 @@ def get_articles(
         else:
             raw_items = _sort_kritisch_first(raw_items)
 
+        # view=unread — nach read_map filtern
+        if view == "unread" and user and read_map_fn:
+            ids = [a["id"] for a in raw_items]
+            rmap = read_map_fn(ids)
+            raw_items = [a for a in raw_items if user not in rmap.get(a["id"], [])]
+
         total      = len(raw_items)
         start      = (page - 1) * page_size
         page_items = raw_items[start: start + page_size]
         return [Article.from_cosmos_doc(doc) for doc in page_items], total
 
     else:
+        # --- In-Memory-Pfad ---
         items = list(_memory_store.values())
+
         if category:
             items = [a for a in items if a.get("category") == category]
         if platform:
-            items = [a for a in items if a.get("platform") == platform]
+            items = [a for a in items if a.get("platform") in (platform, "cross")]
+        if q:
+            q_lower = q.lower()
+            items = [
+                a for a in items
+                if q_lower in (a.get("title") or "").lower()
+                or q_lower in (a.get("summary") or "").lower()
+                or q_lower in (a.get("source") or "").lower()
+            ]
+        if topic:
+            items = [a for a in items if topic in (a.get("topics") or [])]
+        if source:
+            items = [a for a in items if a.get("source") == source]
+        if since:
+            items = [
+                a for a in items
+                if (a.get("published_at") or a.get("fetched_at") or "") > since
+            ]
 
         if collapse:
             items = _collapse_clusters(items)
         else:
             items = _sort_kritisch_first(items)
+
+        # view=unread
+        if view == "unread" and user and read_map_fn:
+            ids = [a["id"] for a in items]
+            rmap = read_map_fn(ids)
+            items = [a for a in items if user not in rmap.get(a["id"], [])]
 
         total      = len(items)
         start      = (page - 1) * page_size
@@ -193,11 +263,12 @@ def get_articles(
 
 def get_article_by_id(article_id: str) -> Article | None:
     if _use_cosmos():
-        if not article_id.replace("-", "").replace("_", "").isalnum():
-            return None
-        query = f"SELECT * FROM c WHERE c.id = '{article_id}'"
         try:
-            results = list(_get_container().query_items(query, enable_cross_partition_query=True))
+            results = list(_get_container().query_items(
+                "SELECT * FROM c WHERE c.id = @id",
+                parameters=[{"name": "@id", "value": article_id}],
+                enable_cross_partition_query=True,
+            ))
             return Article.from_cosmos_doc(results[0]) if results else None
         except Exception as exc:
             logger.error("Cosmos get_article_by_id failed: %s", exc)
@@ -222,7 +293,7 @@ def get_known_ids() -> set[str]:
 def get_pending_articles(limit: int = 200) -> list[Article]:
     """Gibt bis zu `limit` PENDING-Artikel zurück (älteste zuerst für FIFO-Retry)."""
     if _use_cosmos():
-        query = f"SELECT TOP {limit} * FROM c WHERE c.category = 'PENDING' ORDER BY c.fetched_at ASC"
+        query = f"SELECT TOP {int(limit)} * FROM c WHERE c.category = 'PENDING' ORDER BY c.fetched_at ASC"
         try:
             rows = list(_get_container().query_items(query, enable_cross_partition_query=True))
             return [Article.from_cosmos_doc(r) for r in rows]
@@ -241,13 +312,13 @@ def get_pending_articles(limit: int = 200) -> list[Article]:
 def get_stale_articles(prompt_version: str, limit: int = 500) -> list[Article]:
     """Gibt Artikel zurück, deren prompt_version nicht der aktuellen entspricht."""
     if _use_cosmos():
-        query = (
-            f"SELECT TOP {limit} * FROM c "
-            f"WHERE c.prompt_version != '{prompt_version}' "
-            f"AND c.category != 'OFF_TOPIC'"
-        )
+        query = f"SELECT TOP {int(limit)} * FROM c WHERE c.prompt_version != @pv AND c.category != 'OFF_TOPIC'"
         try:
-            rows = list(_get_container().query_items(query, enable_cross_partition_query=True))
+            rows = list(_get_container().query_items(
+                query,
+                parameters=[{"name": "@pv", "value": prompt_version}],
+                enable_cross_partition_query=True,
+            ))
             return [Article.from_cosmos_doc(r) for r in rows]
         except Exception as exc:
             logger.error("Cosmos get_stale_articles failed: %s", exc)

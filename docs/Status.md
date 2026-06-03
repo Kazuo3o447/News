@@ -1,6 +1,6 @@
 # Projektstatus — IT News Hub
 
-> Letzte Aktualisierung: Juni 2026 (Copilot-Brief 02 — Frontend & UX)
+> Letzte Aktualisierung: Juni 2026 (Copilot-Brief 03 — Backend, Daten & KI)
 
 ---
 
@@ -8,13 +8,33 @@
 
 ```
 Infrastruktur  ████░░░░░░  40 %
-Backend        █████████░  90 %
+Backend        ██████████ 100 %
 Frontend       ████████░░  80 %
-KI / Groq      █████████░  90 %
+KI / Groq      ██████████ 100 %
 Deployment     ░░░░░░░░░░   0 %
 ```
 
 ---
+
+## Copilot-Brief 03 — Backend, Daten & KI ✅ Abgeschlossen (Juni 2026)
+
+- [x] **B1** `services/cosmos_service.py`: Server-seitiger Filter/Suche/Sort — neue Parameter `view`, `q`, `topic`, `source`, `since` in `get_articles()`; `page_size` hard-cap 60; Platform-Filter inkl. `cross`; **alle** Cosmos-Queries nun parametrisiert (SQL-Injection-Fix)
+- [x] **B1** `api/routes/news.py`: Vollständig neu geschrieben — `GET /api/news` mit neuen Query-Params `view`, `q`, `topic`, `source`, `since`, `collapse`; Response-Struktur `{total, page, page_size, view, collapse, items}`; `is_priority` Flag pro Artikel
+- [x] **B2** `services/identity.py` **NEU**: User-Extraktion aus `X-MS-CLIENT-PRINCIPAL-NAME` → `X-User` → `"anonymous"` (kein Login-Build nötig)
+- [x] **B2** `services/read_state.py` **NEU**: Team-Read-State (per User, per Artikel); Cosmos `reads`-Container + In-Memory-Fallback; `mark_read`, `mark_unread`, `mark_read_bulk`, `read_map`, `is_read`; parametrisierte IN-Clause
+- [x] **B2** `api/routes/news.py`: Neue Endpunkte `POST /api/articles/{id}/read`, `DELETE /api/articles/{id}/read`, `POST /api/articles/read/bulk` (max 500); Response-Anreicherung mit `read_by`, `is_read`
+- [x] **B3** `services/rss_fetcher.py`: `fetch_all_feeds(priorities: set[str] | None)` — filtert FEEDS nach `feed_cfg["priority"]` wenn angegeben
+- [x] **B3** `services/scheduler.py`: `run_pipeline(priority_filter)` — 3 Tiered-Jobs: `pipeline_high` (10 min), `pipeline_medium` (30 min), `pipeline_low` (60 min)
+- [x] **B4** `services/groq_classifier.py`: Zweistufige Groq-Modelle — `GROQ_MODEL_CLASSIFY` (`llama-3.1-8b-instant`) für `classify_batch()`; `GROQ_MODEL_SUMMARY` (`openai/gpt-oss-120b`) für `summarize_critical()`
+- [x] **B4/B5** `services/groq_classifier.py`: SYSTEM_PROMPT erweitert mit M365/Azure Few-Shots: Azure Outage → KRITISCH/windows; Entra ID Auth-Ausfall → KRITISCH/windows; MC-Einträge ohne Security → NORMAL/windows
+- [x] **B5** `services/groq_classifier.py`: `summarize_critical(articles)` **NEU** — deutsche Handlungszeilen ≤140 Zeichen für KRITISCH-Artikel via starkem Modell; `TLDR_SYSTEM_PROMPT` separat
+- [x] **B5** `services/scheduler.py`: TL;DR-Block nach Klassifizierung — `summarize_critical(new_kritisch)` → `a.tldr` setzen → `upsert_many()` re-persist vor Teams-Push
+- [x] **B6** `services/notifier.py`: Cluster-Dedup mit In-Memory Dict + optionaler Cosmos `notified`-Persistenz (TTL = `DEDUP_WINDOW_HOURS`); `was_notified()`, `mark_notified()`; `notify_critical()` filtert bereits notifizierte Cluster; Payload mit `tldr` + `cluster_size`
+- [x] **B7** `services/scheduler.py`: `start_scheduler()` prüft `settings.RUN_SCHEDULER` — bei `False` No-op (scale-out-sicher, kein Doppel-Job auf mehreren Instanzen)
+- [x] **B8** `eval/gold_set.jsonl`: 15 → **45 Einträge** — M365 Message Center (MC), Azure Outages, Entra ID Auth-Ausfälle, MSRC Patch Tuesday (kritisch + normal), Android Security Bulletin, Samsung SMR, Apple RSR, OpenSSL/Log4j (cross), CISA KEV, NIS2; + DUMP-Fälle
+- [x] **B8** `eval/run_eval.py`: Separate Accuracy-Ausgabe für Criticality (`>= 0.80`) und Platform (`>= 0.70`); Exit-Code ≠ 0 bei Unterschreitung beider Schwellen
+
+
 
 ## Copilot-Brief 01 — Backend & KI-Pipeline ✅ Abgeschlossen (Juni 2026)
 

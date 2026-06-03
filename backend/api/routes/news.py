@@ -5,12 +5,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
 
 from api.models.article import Article
 from config.feeds import FEEDS
 from config.settings import settings
 from services import cosmos_service, feed_health
+from services.identity import current_user
 from services.scheduler import run_pipeline, reclassify_stale
 from services.topics import PLATFORMS, TOPICS
 
@@ -18,31 +19,86 @@ router = APIRouter(tags=["news"])
 
 _VALID_CATEGORIES = {"KRITISCH", "NORMAL", "DUMP", "OFF_TOPIC", "PENDING"}
 _VALID_PLATFORMS  = {"windows", "apple", "android", "cross"}
+_VALID_VIEWS      = {"all", "unread", "critical"}
+
+
+def _is_priority(article: Article) -> bool:
+    """B3: Abgeleitetes Flag — True für Windows/Microsoft und cross-Security."""
+    if article.platform == "windows":
+        return True
+    if "microsoft" in (article.topics or []):
+        return True
+    return False
 
 
 @router.get("/news", response_model=dict)
 async def get_news(
+    request: Request,
+    # legacy filter (kept for backwards compat)
     category: Literal["KRITISCH", "NORMAL", "DUMP", "OFF_TOPIC", "PENDING"] | None = Query(default=None),
-    platform: Literal["windows", "apple", "android", "cross"] | None = Query(default=None),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=500),
-    collapse: bool = Query(default=True, description="Pro cluster_id nur den Repräsentanten zurückgeben"),
+    # B1 new params
+    view:      str | None = Query(default="all",  description="all | unread | critical"),
+    platform:  Literal["windows", "apple", "android", "cross"] | None = Query(default=None),
+    q:         str | None = Query(default=None,   description="Freitext in Titel/Summary/Quelle"),
+    topic:     str | None = Query(default=None,   description="Topic-Key"),
+    source:    str | None = Query(default=None,   description="Quellenname"),
+    since:     str | None = Query(default=None,   description="ISO-8601: nur Artikel neuer als"),
+    page:      int        = Query(default=1, ge=1),
+    page_size: int        = Query(default=30, ge=1, le=60),
+    collapse:  bool       = Query(default=True,   description="Pro cluster_id nur Repräsentant"),
 ):
-    """Gibt paginierte Artikel zurück, optional gefiltert nach Kategorie und/oder Plattform."""
+    """
+    Gibt paginierte, server-seitig gefilterte und sortierte Artikel zurück.
+    Sortierung: KRITISCH zuerst (höchster CVSS), dann published_at DESC.
+    """
+    if view and view not in _VALID_VIEWS:
+        raise HTTPException(status_code=422, detail=f"Ungültiger view-Wert: {view!r}")
     if category is not None and category not in _VALID_CATEGORIES:
         raise HTTPException(status_code=422, detail="Ungültige Kategorie")
     if platform is not None and platform not in _VALID_PLATFORMS:
         raise HTTPException(status_code=422, detail="Ungültige Plattform")
 
+    # view=critical setzt implizit category
+    if view == "critical":
+        category = "KRITISCH"
+
+    user = current_user(request)
+
+    from services import read_state
     articles, total = cosmos_service.get_articles(
-        category=category, platform=platform, page=page, page_size=page_size, collapse=collapse
+        category=category,
+        platform=platform,
+        page=page,
+        page_size=page_size,
+        collapse=collapse,
+        view=view,
+        q=q,
+        topic=topic,
+        source=source,
+        since=since,
+        user=user,
+        read_map_fn=read_state.read_map,
     )
+
+    # B2 — read_by / is_read Anreicherung
+    ids  = [a.id for a in articles]
+    rmap = read_state.read_map(ids)
+
+    items_out = []
+    for a in articles:
+        d = a.model_dump()
+        d["read_by"] = rmap.get(a.id, [])
+        d["is_read"] = user in d["read_by"]
+        d["is_priority"] = _is_priority(a)   # B3
+        items_out.append(d)
+
     return {
         "total":     total,
         "page":      page,
         "page_size": page_size,
+        "view":      view or "all",
         "collapse":  collapse,
-        "items":     [a.model_dump() for a in articles],
+        "items":     items_out,
     }
 
 
@@ -54,6 +110,39 @@ async def get_article(article_id: str):
         raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
     return article
 
+
+# ---------------------------------------------------------------------------
+# B2 — Team Read-State Endpunkte
+# ---------------------------------------------------------------------------
+
+@router.post("/articles/{article_id}/read", status_code=204)
+async def mark_article_read(article_id: str, request: Request):
+    """Markiert Artikel als gelesen für den aktuellen User."""
+    from services import read_state
+    read_state.mark_read(article_id, current_user(request))
+
+
+@router.delete("/articles/{article_id}/read", status_code=204)
+async def mark_article_unread(article_id: str, request: Request):
+    """Entfernt Gelesen-Markierung für den aktuellen User."""
+    from services import read_state
+    read_state.mark_unread(article_id, current_user(request))
+
+
+@router.post("/articles/read/bulk", status_code=204)
+async def mark_articles_read_bulk(body: dict, request: Request):
+    """Markiert mehrere Artikel als gelesen. Body: { 'ids': ['id1', 'id2', ...] }"""
+    ids = body.get("ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=422, detail="'ids' muss eine Liste sein")
+    ids = [str(i) for i in ids[:500]]  # max 500 auf einmal
+    from services import read_state
+    read_state.mark_read_bulk(ids, current_user(request))
+
+
+# ---------------------------------------------------------------------------
+# Refresh / Reklassifizierung
+# ---------------------------------------------------------------------------
 
 @router.post("/refresh", status_code=202)
 async def trigger_refresh(
@@ -75,7 +164,6 @@ async def trigger_reclassify(
 ):
     """
     Reklassifiziert PENDING-Artikel oder (stale=true) alle Artikel mit veralteter prompt_version.
-    Muss mit X-Refresh-Secret abgesichert sein, wenn REFRESH_SECRET konfiguriert ist.
     """
     if settings.REFRESH_SECRET and x_refresh_secret != settings.REFRESH_SECRET:
         raise HTTPException(status_code=401, detail="Ungültiges oder fehlendes X-Refresh-Secret")

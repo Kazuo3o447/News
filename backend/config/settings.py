@@ -3,14 +3,21 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     GROQ_API_KEY: str = ""          # Leer = Groq deaktiviert, Artikel werden als NORMAL eingestuft
-    # Starkes Modell für Cross-Platform-Klassifizierung.
-    # Sparoption (schwächer): llama-3.1-8b-instant
-    GROQ_MODEL: str = "openai/gpt-oss-120b"
+
+    # B4: Zwei Modelle — schnelles für Klassifizierung, starkes für TL;DR
+    GROQ_MODEL_CLASSIFY: str = "llama-3.1-8b-instant"   # schnell, günstig, reicht für 3 Klassen
+    GROQ_MODEL_SUMMARY:  str = "openai/gpt-oss-120b"    # stark, nur für KRITISCH TL;DR
+    # Alias für Abwärtskompatibilität
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
 
     AZURE_COSMOS_ENDPOINT: str = ""  # Leer = In-Memory-Speicher (Dev-Modus)
     AZURE_COSMOS_KEY: str = ""
     AZURE_COSMOS_DB: str = "newsdb"
     AZURE_COSMOS_CONTAINER: str = "articles"
+    # B2: eigener Container für Team-Gelesen-Status
+    AZURE_COSMOS_READS_CONTAINER: str = "reads"
+    # B6: eigener Container für Benachrichtigungs-Tracking
+    AZURE_COSMOS_NOTIFIED_CONTAINER: str = "notified"
 
     APP_ENV: str = "development"
     APP_SECRET_KEY: str = "change_me"
@@ -29,13 +36,16 @@ class Settings(BaseSettings):
     DEFAULT_PLATFORM: str = "cross"
 
     # Prompt-Versionierung — bei jeder relevanten Prompt-Änderung hochzählen
-    PROMPT_VERSION: str = "2025-06-01"
+    PROMPT_VERSION: str = "2026-06-03"
     # Zeitfenster für Dedup/Clustering in Stunden
     DEDUP_WINDOW_HOURS: int = 72
     # Teams-Webhook für KRITISCH-Push; leer = Push deaktiviert (No-op)
     TEAMS_WEBHOOK_URL: str = ""
-    # TL;DR für KRITISCH-Artikel (kostet Tokens); standardmäßig deaktiviert
-    ENABLE_CRITICAL_TLDR: bool = False
+    # B5: TL;DR für KRITISCH-Artikel — jetzt standardmäßig AN
+    ENABLE_CRITICAL_TLDR: bool = True
+
+    # B7: Scheduler-Guard — bei Scale-out nur eine Instanz mit True
+    RUN_SCHEDULER: bool = True
 
     class Config:
         env_file = ".env"

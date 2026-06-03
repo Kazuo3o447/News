@@ -29,8 +29,10 @@ from services.groq_classifier import classify_batch
 from services.pre_filter import pre_filter
 from services.rule_classifier import apply_rules
 
-GOLD_FILE      = Path(__file__).parent / "gold_set.jsonl"
-FAIL_THRESHOLD = 0.75   # Makro-F1 unter diesem Wert → Exit-Code 1
+GOLD_FILE               = Path(__file__).parent / "gold_set.jsonl"
+FAIL_THRESHOLD          = 0.75   # Gesamt-Makro-F1 (legacy, für CI-Summary)
+CRITICALITY_THRESHOLD   = 0.80   # B8: separater Schwellenwert für Kategorie-Accuracy
+PLATFORM_THRESHOLD      = 0.70   # B8: separater Schwellenwert für Plattform-Accuracy
 
 
 # ---------------------------------------------------------------------------
@@ -193,15 +195,28 @@ def main() -> int:
     else:
         print("\n  Keine Fehlklassifikationen!")
 
+    # --- Accuracy pro Dimension ---
+    criticality_acc = sum(1 for l, p in zip(true_cats, pred_cats) if l == p) / len(true_cats)
+    platform_acc    = sum(1 for l, p in zip(true_plat, pred_plat) if l == p) / len(true_plat)
+
     # --- Schwellenwert ---
     overall_f1 = (cat_metrics["macro_f1"] + plat_metrics["macro_f1"]) / 2
     print(f"\n  Gesamt-F1 (Kat+Plat Ø): {overall_f1:.3f}  |  Schwelle: {FAIL_THRESHOLD}")
+    print(f"  Criticality Accuracy:    {criticality_acc:.3f}  |  Schwelle: {CRITICALITY_THRESHOLD}")
+    print(f"  Platform Accuracy:       {platform_acc:.3f}  |  Schwelle: {PLATFORM_THRESHOLD}")
 
-    if overall_f1 < FAIL_THRESHOLD:
-        print(f"\n[FAIL] Makro-F1 {overall_f1:.3f} < Schwelle {FAIL_THRESHOLD}  → Exit 1")
+    failed = False
+    if criticality_acc < CRITICALITY_THRESHOLD:
+        print(f"\n[FAIL] Criticality Accuracy {criticality_acc:.3f} < {CRITICALITY_THRESHOLD}  → Exit 1")
+        failed = True
+    if platform_acc < PLATFORM_THRESHOLD:
+        print(f"\n[FAIL] Platform Accuracy {platform_acc:.3f} < {PLATFORM_THRESHOLD}  → Exit 1")
+        failed = True
+
+    if failed:
         return 1
 
-    print(f"\n[PASS] Makro-F1 {overall_f1:.3f} >= Schwelle {FAIL_THRESHOLD}")
+    print(f"\n[PASS] Criticality={criticality_acc:.3f} >= {CRITICALITY_THRESHOLD}  |  Platform={platform_acc:.3f} >= {PLATFORM_THRESHOLD}")
     return 0
 
 

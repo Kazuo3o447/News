@@ -87,10 +87,15 @@ def _merge_article(raw: dict, llm: dict, rules: dict, recent: list[Article]) -> 
 # Pipeline-Job
 # ---------------------------------------------------------------------------
 
-def run_pipeline() -> None:
-    logger.info("Pipeline gestartet ...")
+def run_pipeline(priority_filter: set[str] | None = None) -> None:
+    """
+    B3: priority_filter steuert welche Feeds gefetcht werden.
+    None = alle (Fallback/manueller Aufruf).
+    """
+    label = f"priority={priority_filter}" if priority_filter else "alle"
+    logger.info("Pipeline gestartet (%s) ...", label)
 
-    raw_articles = fetch_all_feeds()
+    raw_articles = fetch_all_feeds(priorities=priority_filter)
     if not raw_articles:
         logger.warning("Pipeline: Keine Artikel von Feeds erhalten.")
         return
@@ -204,6 +209,17 @@ def run_pipeline() -> None:
         "Pipeline abgeschlossen: off_topic=%d, batches=%d, forced_critical=%d, ok=%d, err=%d",
         off_topic_count, len(chunks), forced_critical_count, total_ok, total_err,
     )
+
+    # B5: TL;DR für KRITISCH-Artikel generieren, dann re-persist
+    if new_kritisch and settings.ENABLE_CRITICAL_TLDR:
+        from services.groq_classifier import summarize_critical
+        tldr_map = summarize_critical(new_kritisch)
+        if tldr_map:
+            for a in new_kritisch:
+                if a.id in tldr_map and tldr_map[a.id]:
+                    a.tldr = tldr_map[a.id]
+            upsert_many(new_kritisch)
+            logger.info("B5: %d KRITISCH-TL;DRs persistiert.", len(tldr_map))
 
     # Teams-Push fur neu klassifizierte KRITISCH-Artikel
     if new_kritisch:
@@ -379,15 +395,35 @@ def _run_apple_scraper() -> None:
 
 def start_scheduler() -> None:
     global _scheduler
+    # B7: scale-safe guard — nur starten wenn RUN_SCHEDULER=true
+    if not settings.RUN_SCHEDULER:
+        logger.info("Scheduler deaktiviert (RUN_SCHEDULER=false). Bei Scale-out nur eine Instanz aktivieren.")
+        return
+
     if _scheduler and _scheduler.running:
         return
 
     _scheduler = BackgroundScheduler()
 
+    # B3: Tiered Polling — high=10 min, medium=30 min, low=60 min
     _scheduler.add_job(
-        run_pipeline,
-        trigger=IntervalTrigger(minutes=settings.FEED_REFRESH_INTERVAL_MINUTES),
-        id="pipeline",
+        lambda: run_pipeline(priority_filter={"high"}),
+        trigger=IntervalTrigger(minutes=10),
+        id="pipeline_high",
+        replace_existing=True,
+        max_instances=1,
+    )
+    _scheduler.add_job(
+        lambda: run_pipeline(priority_filter={"medium"}),
+        trigger=IntervalTrigger(minutes=30),
+        id="pipeline_medium",
+        replace_existing=True,
+        max_instances=1,
+    )
+    _scheduler.add_job(
+        lambda: run_pipeline(priority_filter={"low"}),
+        trigger=IntervalTrigger(minutes=60),
+        id="pipeline_low",
         replace_existing=True,
         max_instances=1,
     )
@@ -413,8 +449,8 @@ def start_scheduler() -> None:
 
     _scheduler.start()
     logger.info(
-        "Scheduler gestartet (Pipeline alle %d min, Android-Scraper montags 06:00 UTC, Apple-Scraper täglich 07:00 UTC)",
-        settings.FEED_REFRESH_INTERVAL_MINUTES,
+        "Scheduler gestartet (high=10 min, medium=30 min, low=60 min; "
+        "Android-Scraper montags 06:00 UTC, Apple-Scraper täglich 07:00 UTC)"
     )
 
 
