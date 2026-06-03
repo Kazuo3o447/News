@@ -56,6 +56,12 @@
   --header-h: 64px;
   --sidebar-w: 280px;
   --content-max: 1600px;
+
+  /* --- Platform Colors (gedämpft; GEMA-Rot bleibt Signalfarbe) --- */
+  --plat-windows:    #2563EB;  --plat-windows-bg:  #EAF1FF;
+  --plat-apple:      #444448;  --plat-apple-bg:    #F0F0F2;
+  --plat-android:    #2E9E5B;  --plat-android-bg:  #E9F7EF;
+  --plat-cross:      #6E6E73;  --plat-cross-bg:    #F1F1F3;
 }
 
 /* ============================================================ Base ============================================================ */
@@ -874,3 +880,308 @@ button { font-family: inherit; }
 .priority--medium .priority__dot { background: var(--cat-normal); }
 .priority--low    { color: var(--cat-dump-strong); }
 .priority--low    .priority__dot { background: var(--cat-dump); }
+
+/* ============================================================
+   Platform Switcher (segmented control)
+   ============================================================ */
+.platform-switcher {
+  display: inline-flex;
+  background: var(--gema-bg-alt);
+  border: 1px solid var(--gema-border);
+  border-radius: var(--r-md);
+  padding: 3px;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.platform-switcher__seg {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3);
+  border-radius: calc(var(--r-md) - 2px);
+  border: 0;
+  background: transparent;
+  color: var(--gema-text-soft);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.platform-switcher__seg:hover:not(.--active) {
+  background: var(--gema-surface);
+  color: var(--gema-text);
+}
+
+.platform-switcher__seg.--active {
+  background: var(--gema-red);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--sh-sm);
+}
+
+.platform-switcher__count {
+  font-size: var(--t-xs);
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .platform-switcher { width: 100%; }
+  .platform-switcher__seg { flex: 1; justify-content: center; }
+}
+
+/* ============================================================
+   Platform Badges
+   ============================================================ */
+.badge--platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px var(--s-2);
+  border-radius: var(--r-sm);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.badge--windows { color: var(--plat-windows); background: var(--plat-windows-bg); }
+.badge--apple   { color: var(--plat-apple);   background: var(--plat-apple-bg);   }
+.badge--android { color: var(--plat-android); background: var(--plat-android-bg); }
+.badge--cross   { color: var(--plat-cross);   background: var(--plat-cross-bg);   }
+
+/* ============================================================
+   "Neu"-Indikator
+   ============================================================ */
+.dot--new {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gema-red);
+  flex-shrink: 0;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.badge--new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--gema-red-soft);
+  color: var(--cat-kritisch-strong);
+  font-size: var(--t-xs);
+  font-weight: 700;
+}
+
+/* ============================================================
+   Section Headings (Zwei-Ebenen-Layout)
+   ============================================================ */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) 0 var(--s-2);
+  margin-bottom: var(--s-3);
+  border-bottom: 2px solid var(--gema-border);
+}
+
+.section-head--kritisch { border-bottom-color: var(--cat-kritisch); }
+
+.section-head__title {
+  font-size: var(--t-md);
+  font-weight: 700;
+  color: var(--gema-text);
+  letter-spacing: -0.01em;
+}
+
+.section-head--kritisch .section-head__title { color: var(--cat-kritisch-strong); }
+
+.section-head__count {
+  font-size: var(--t-sm);
+  font-weight: 700;
+  color: #fff;
+  background: var(--gema-red);
+  padding: 1px 8px;
+  border-radius: 99px;
+}
+
+.section-head--normal .section-head__count {
+  background: var(--gema-bg-alt);
+  color: var(--gema-text-soft);
+}
+
+/* ============================================================
+   Dense list rows (NORMAL / übrige Artikel)
+   ============================================================ */
+.news-rows {
+  display: flex;
+  flex-direction: column;
+  background: var(--gema-surface);
+  border: 1px solid var(--gema-border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.news-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px var(--s-4);
+  min-height: 48px;
+  border-bottom: 1px solid var(--gema-border-soft);
+  transition: background 0.1s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.news-row:last-child { border-bottom: 0; }
+
+.news-row:hover { background: var(--gema-bg); }
+
+.news-row--dump { opacity: 0.65; }
+
+.news-row--read { opacity: 0.55; }
+
+.news-row--read .news-row__title { color: var(--gema-muted); }
+
+.news-row__badges {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex-shrink: 0;
+}
+
+.news-row__title {
+  flex: 1;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--gema-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.news-row__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.news-row__title a:hover { color: var(--gema-red); }
+
+.news-row__source {
+  font-size: var(--t-xs);
+  color: var(--gema-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.news-row__time {
+  font-size: var(--t-xs);
+  color: var(--gema-subtle);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: right;
+}
+
+.news-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.news-row:hover .news-row__actions { opacity: 1; }
+
+/* ============================================================
+   Card / Row Action Buttons
+   ============================================================ */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--gema-border);
+  border-radius: var(--r-sm);
+  background: var(--gema-surface);
+  color: var(--gema-text-soft);
+  font-size: var(--t-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.action-btn:hover {
+  border-color: var(--gema-red);
+  color: var(--gema-red);
+  background: var(--gema-red-soft);
+}
+
+.action-btn--icon {
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--gema-muted);
+}
+
+.action-btn--icon:hover {
+  background: var(--gema-red-soft);
+  color: var(--gema-red);
+  border: 0;
+}
+
+.news-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--gema-border-soft);
+}
+
+/* ============================================================
+   Read-state on cards
+   ============================================================ */
+.news-card--read {
+  opacity: 0.6;
+}
+
+/* ============================================================
+   "Mark all read" button in results bar
+   ============================================================ */
+.mark-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--s-3);
+  border: 1px solid var(--gema-border);
+  border-radius: var(--r-md);
+  background: var(--gema-surface);
+  color: var(--gema-muted);
+  font-size: var(--t-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.mark-all-btn:hover {
+  border-color: var(--gema-red);
+  color: var(--gema-red);
+  background: var(--gema-red-soft);
+}

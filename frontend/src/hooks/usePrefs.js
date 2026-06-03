@@ -1,35 +1,48 @@
-/**
- * Persistente User-Präferenzen via localStorage.
- * Single-User-Personalisierung — keine Server-Komponente nötig.
+﻿/**
+ * Persistente User-Praeferenzen via localStorage.
+ * Single-User-Personalisierung - keine Server-Komponente noetig.
  */
-import { useEffect, useState } from 'react'
-import { TOPICS } from '../utils/topics'
+import { useEffect, useRef, useState } from "react"
+import { TOPICS } from "../utils/topics"
 
-const KEY = 'itnews.prefs.v1'
+const KEY = "itnews.prefs.v2"
 
 const DEFAULTS = {
-  subscribedTopics: ['security', 'microsoft'],   // Default-Fokus
-  mutedSources:    [],
-  showOffTopic:    false,                        // OFF_TOPIC standardmäßig aus
-  showDump:        false,                        // DUMP standardmäßig aus
+  subscribedTopics:  ["security", "microsoft"],
+  mutedSources:      [],
+  showOffTopic:      false,
+  showDump:          false,
+  selectedPlatform:  "all",   // "all" | "windows" | "apple" | "android"
+  readIds:           [],      // persisted as Array, used as Set internally
+  lastVisitAt:       null,    // ISO-String - vorletzter Besuch (fuer "neu seit")
 }
 
 const VALID_TOPIC_KEYS = new Set(TOPICS.map(t => t.key))
+const VALID_PLATFORMS  = new Set(["all", "windows", "apple", "android"])
 
 function sanitizePrefs(rawPrefs) {
   const merged = { ...DEFAULTS, ...(rawPrefs || {}) }
   return {
     ...merged,
     subscribedTopics: (merged.subscribedTopics || []).filter(key => VALID_TOPIC_KEYS.has(key)),
-    mutedSources: merged.mutedSources || [],
-    showOffTopic: Boolean(merged.showOffTopic),
-    showDump: Boolean(merged.showDump),
+    mutedSources:     merged.mutedSources || [],
+    showOffTopic:     Boolean(merged.showOffTopic),
+    showDump:         Boolean(merged.showDump),
+    selectedPlatform: VALID_PLATFORMS.has(merged.selectedPlatform) ? merged.selectedPlatform : "all",
+    readIds:          Array.isArray(merged.readIds) ? merged.readIds : [],
+    lastVisitAt:      merged.lastVisitAt || null,
   }
 }
 
 function load() {
   try {
-    const raw = localStorage.getItem(KEY)
+    // Migrate from v1 key
+    const rawV1 = localStorage.getItem("itnews.prefs.v1")
+    const raw   = localStorage.getItem(KEY)
+    if (!raw && rawV1) {
+      const v1 = JSON.parse(rawV1)
+      return sanitizePrefs(v1)
+    }
     if (!raw) return { ...DEFAULTS }
     return sanitizePrefs(JSON.parse(raw))
   } catch {
@@ -40,10 +53,14 @@ function load() {
 export function usePrefs() {
   const [prefs, setPrefs] = useState(load)
 
+  // readIds as an in-memory Set for O(1) lookup
+  const readSet = useRef(new Set(prefs.readIds))
+
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify(sanitizePrefs(prefs))) } catch {}
   }, [prefs])
 
+  // ---- existing actions ----
   const toggleTopic = (key) => setPrefs(p => ({
     ...p,
     subscribedTopics: p.subscribedTopics.includes(key)
@@ -60,8 +77,49 @@ export function usePrefs() {
 
   const setShowOffTopic = (v) => setPrefs(p => ({ ...p, showOffTopic: v }))
   const setShowDump     = (v) => setPrefs(p => ({ ...p, showDump: v }))
+  const resetPrefs      = ()  => setPrefs({ ...DEFAULTS })
 
-  const resetPrefs = () => setPrefs({ ...DEFAULTS })
+  // ---- new F1 actions ----
+  const setSelectedPlatform = (plat) => setPrefs(prev => ({
+    ...prev,
+    selectedPlatform: VALID_PLATFORMS.has(plat) ? plat : "all",
+  }))
 
-  return { prefs, toggleTopic, toggleSource, setShowOffTopic, setShowDump, resetPrefs }
+  const markRead = (id) => {
+    if (readSet.current.has(id)) return
+    readSet.current.add(id)
+    const newIds = Array.from(readSet.current)
+    setPrefs(p => ({ ...p, readIds: newIds }))
+  }
+
+  const markAllRead = (ids) => {
+    for (const id of ids) readSet.current.add(id)
+    const newIds = Array.from(readSet.current)
+    setPrefs(p => ({ ...p, readIds: newIds }))
+  }
+
+  const isRead = (id) => readSet.current.has(id)
+
+  /**
+   * Setzt lastVisitAt auf jetzt (aktuellen Besuch speichern).
+   * Gibt den ALTEN Wert zurueck - damit das Dashboard "neu seit letztem Besuch"
+   * gegen den vorherigen Zeitstempel rechnen kann.
+   * Einmal beim Dashboard-Mount aufrufen.
+   */
+  const touchVisit = () => {
+    const prev = prefs.lastVisitAt
+    const now  = new Date().toISOString()
+    setPrefs(p => ({ ...p, lastVisitAt: now }))
+    return prev
+  }
+
+  return {
+    prefs,
+    // existing
+    toggleTopic, toggleSource, setShowOffTopic, setShowDump, resetPrefs,
+    // new F1
+    setSelectedPlatform,
+    markRead, markAllRead, isRead,
+    touchVisit,
+  }
 }
