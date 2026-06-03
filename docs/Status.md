@@ -29,6 +29,7 @@ Deployment     ░░░░░░░░░░   0 %
 - [x] `services/groq_classifier.py`: Cross-Platform-Prompt; classify_batch() (12 Artikel/Request); classify_article() als Wrapper; Modell via settings.GROQ_MODEL
 - [x] `services/scheduler.py`: Pipeline vollständig verdrahtet (Pre-Filter → Regelschicht → Groq-Batch → Merge → Cosmos); THROTTLE 6s→1s; Bug 1+2 behoben
 - [x] `services/android_scraper.py` **NEU**: Monatlicher Scraper für Android Security Bulletin + Samsung SMR (kein RSS)
+- [x] `services/vendor_scraper.py` **NEU** (T9): `scrape_apple_security()` — täglich von support.apple.com/en-us/100100 (iOS, macOS, Safari, Xcode); in Scheduler als täglicher Cron-Job 07:00 UTC eingehängt; gleiche Pipeline wie RSS-Feeds (Pre-Filter → Regelschicht → Batch-LLM → Merge → Cosmos)
 - [x] `.env.example` aktualisiert
 
 - [x] Konzept & Architektur definiert
@@ -54,7 +55,8 @@ Deployment     ░░░░░░░░░░   0 %
 - [x] Groq-Classifier Service (`groq_classifier.py`) implementiert (Batch 12/Request, Cross-Platform-Prompt)
 - [x] Rule-Classifier Service (`rule_classifier.py`) implementiert (deterministisch: CVE / CVSS / Exploit-Signale)
 - [x] Android Scraper (`android_scraper.py`) implementiert (monatlich via APScheduler)
-- [x] APScheduler für automatischen Feed-Refresh eingerichtet (30 min; Android monatlich)
+- [x] Apple Scraper (`vendor_scraper.py`, `scrape_apple_security()`) implementiert (täglich via APScheduler; support.apple.com/en-us/100100)
+- [x] APScheduler für automatischen Feed-Refresh eingerichtet (30 min; Android monatlich montags; Apple täglich 07:00 UTC)
 - [x] Azure Cosmos DB Anbindung implementiert (In-Memory-Fallback für lokale Entwicklung)
 - [x] Unit-Tests für Services geschrieben (37 Tests, alle grün)
 - [x] `requirements.txt` finalisiert

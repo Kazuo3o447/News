@@ -14,6 +14,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from api.models.article import Article
 from config.settings import settings
 from services.android_scraper import scrape_android_bulletin, scrape_samsung_smr
+from services.vendor_scraper import scrape_apple_security
 from services.cosmos_service import (
     delete_articles_older_than,
     get_articles,
@@ -341,6 +342,38 @@ def _run_android_scraper() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Apple-Scraper (täglich)
+# ---------------------------------------------------------------------------
+
+def _run_apple_scraper() -> None:
+    logger.info("Apple-Scraper gestartet ...")
+    raw_articles = scrape_apple_security()
+    if not raw_articles:
+        logger.info("Apple-Scraper: Keine neuen Einträge.")
+        return
+
+    known_ids = get_known_ids()
+    new_raw   = [a for a in raw_articles if a["id"] not in known_ids]
+    if not new_raw:
+        logger.info("Apple-Scraper: Alle Einträge bereits bekannt.")
+        return
+
+    recent_articles, _ = get_articles(page_size=200)
+    batch_items = [
+        {"idx": i, "title": a["title"], "source": a.get("source", ""), "summary": a.get("summary", "")}
+        for i, a in enumerate(new_raw)
+    ]
+    results = classify_batch(batch_items)
+    articles: list[Article] = []
+    for res, raw in zip(results, new_raw):
+        rules = apply_rules(raw["title"], raw.get("summary", ""), raw.get("source", ""))
+        articles.append(_merge_article(raw, res, rules, recent_articles))
+
+    upsert_many(articles)
+    logger.info("Apple-Scraper: %d Artikel gespeichert.", len(articles))
+
+
+# ---------------------------------------------------------------------------
 # APScheduler
 # ---------------------------------------------------------------------------
 
@@ -369,9 +402,18 @@ def start_scheduler() -> None:
         max_instances=1,
     )
 
+    _scheduler.add_job(
+        _run_apple_scraper,
+        trigger="cron",
+        hour=7,
+        id="apple_scraper",
+        replace_existing=True,
+        max_instances=1,
+    )
+
     _scheduler.start()
     logger.info(
-        "Scheduler gestartet (Pipeline alle %d min, Android-Scraper montags 06:00 UTC)",
+        "Scheduler gestartet (Pipeline alle %d min, Android-Scraper montags 06:00 UTC, Apple-Scraper täglich 07:00 UTC)",
         settings.FEED_REFRESH_INTERVAL_MINUTES,
     )
 
