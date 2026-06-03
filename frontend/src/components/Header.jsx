@@ -1,7 +1,10 @@
-export default function Header({ activePage, onNavigate }) {
+/**
+ * F5 — Header: verschlankt. GEMA-Rot-Balken, flacher, Dark-Mode-Toggle, Ungelesen-Zahl.
+ */
+export default function Header({ activePage, onNavigate, kritischUnread = 0, darkMode, onToggleDark }) {
   const navItems = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'settings',  label: 'Einstellungen' },
+    { key: "dashboard", label: "Dashboard" },
+    { key: "settings",  label: "Einstellungen" },
   ]
 
   return (
@@ -16,7 +19,7 @@ export default function Header({ activePage, onNavigate }) {
           {navItems.map(({ key, label }) => (
             <button
               key={key}
-              className={`header__nav-btn ${activePage === key ? 'header__nav-btn--active' : ''}`}
+              className={`header__nav-btn${activePage === key ? " header__nav-btn--active" : ""}`}
               onClick={() => onNavigate(key)}
             >
               {label}
@@ -25,8 +28,19 @@ export default function Header({ activePage, onNavigate }) {
         </nav>
 
         <div className="header__meta">
-          <span className="header__status-dot" />
-          <span>Live</span>
+          {kritischUnread > 0 && (
+            <span className="header__unread-pill" title={`${kritischUnread} ungelesene kritische Meldungen`}>
+              {kritischUnread} kritisch
+            </span>
+          )}
+          <button
+            className="header__dark-toggle"
+            onClick={onToggleDark}
+            title={darkMode ? "Hell-Modus" : "Dunkel-Modus"}
+            aria-label="Dark Mode umschalten"
+          >
+            {darkMode ? "&#x2600;" : "&#x263D;"}
+          </button>
         </div>
       </div>
     </header>
