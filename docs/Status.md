@@ -8,9 +8,9 @@
 
 ```
 Infrastruktur  ████░░░░░░  40 %
-Backend        ███████░░░  70 %
-Frontend       ████░░░░░░  40 %
-KI / Groq      ████████░░  80 %
+Backend        █████████░  85 %
+Frontend       █████░░░░░  55 %
+KI / Groq      █████████░  90 %
 Deployment     ░░░░░░░░░░   0 %
 ```
 
@@ -41,19 +41,23 @@ Deployment     ░░░░░░░░░░   0 %
 
 ---
 
-## Phase 2 — Backend Grundgerüst 🔄 In Arbeit
+## Phase 2 — Backend Grundgerüst ✅ Abgeschlossen
 
-- [ ] FastAPI App initialisiert (`backend/main.py`)
-- [ ] Pydantic-Datenmodell `Article` definiert
-- [ ] Endpunkt `GET /api/health` implementiert
-- [ ] Endpunkt `GET /api/news` implementiert (mock data)
-- [ ] RSS-Fetcher Service (`rss_fetcher.py`) implementiert
-- [ ] Feed-Konfiguration (`config/feeds.py`) befüllt
-- [ ] Groq-Classifier Service (`groq_classifier.py`) implementiert
-- [ ] APScheduler für automatischen Feed-Refresh eingerichtet
-- [ ] Azure Cosmos DB Anbindung implementiert
-- [ ] Unit-Tests für Services geschrieben
-- [ ] `requirements.txt` finalisiert
+- [x] FastAPI App initialisiert (`backend/main.py`)
+- [x] Pydantic-Datenmodell `Article` definiert (`platform`, `category`, `confidence`-Felder)
+- [x] Endpunkt `GET /api/health` implementiert
+- [x] Endpunkt `GET /api/news` implementiert (inkl. `platform`- und `category`-Filter, KRITISCH-Sortierung)
+- [x] Endpunkt `GET /api/topics` + `GET /api/platforms` implementiert
+- [x] Endpunkt `POST /api/refresh` mit `X-Refresh-Secret`-Auth implementiert
+- [x] RSS-Fetcher Service (`rss_fetcher.py`) implementiert
+- [x] Feed-Konfiguration (`config/feeds.py`) befüllt (23 Feeds: Windows + Apple + Android + Cross)
+- [x] Groq-Classifier Service (`groq_classifier.py`) implementiert (Batch 12/Request, Cross-Platform-Prompt)
+- [x] Rule-Classifier Service (`rule_classifier.py`) implementiert (deterministisch: CVE / CVSS / Exploit-Signale)
+- [x] Android Scraper (`android_scraper.py`) implementiert (monatlich via APScheduler)
+- [x] APScheduler für automatischen Feed-Refresh eingerichtet (30 min; Android monatlich)
+- [x] Azure Cosmos DB Anbindung implementiert (In-Memory-Fallback für lokale Entwicklung)
+- [x] Unit-Tests für Services geschrieben (37 Tests, alle grün)
+- [x] `requirements.txt` finalisiert
 
 ---
 
@@ -124,12 +128,17 @@ Deployment     ░░░░░░░░░░   0 %
 | Mai 2026 | Cosmos DB statt SQL | Schemalos, gut für variable RSS-Felder |
 | Mai 2026 | Groq llama-3.1-70b | Schnell, kostengünstig, gute DE/EN-Leistung |
 | Mai 2026 | GEMA Farbschema | Corporate Identity, klare Blau-Hierarchie |
+| Juni 2026 | Groq-Modell → `openai/gpt-oss-120b` | Bessere Qualität bei Cross-Platform-Klassifizierung |
+| Juni 2026 | Cross-Platform statt Microsoft-only | Windows + Apple + Android gleichwertig; Copilot-Brief 01 |
+| Juni 2026 | Confidence deterministisch (nicht vom LLM) | `1.0` forced_critical / `0.9` match / `0.6` mismatch — reproduzierbar |
+| Juni 2026 | Rule-Classifier vor LLM | CVE/CVSS/aktiver Exploit zuverlässiger per Regex als per LLM |
 
 ---
 
 ## Nächste Schritte
 
-1. Python-Umgebung einrichten (`python -m venv .venv`)
-2. Backend `main.py` und `requirements.txt` vervollständigen
-3. Groq API-Key besorgen und in `.env` eintragen
-4. Ersten RSS-Fetch + Klassifizierung lokal testen
+1. Frontend: Platform-Filter und Plattform-Badges in `FilterSidebar.jsx` + `NewsCard.jsx` integrieren
+2. Frontend: `GET /api/platforms` und `GET /api/topics` konsumieren (statt hard-coded Listen)
+3. Azure: Infrastruktur provisionieren (`infrastructure/main.bicep`)
+4. CI/CD: GitHub Actions für Backend (pytest + ruff) und Frontend (build) einrichten
+5. Deployment: Erstes Deployment auf Azure App Service + Static Web Apps

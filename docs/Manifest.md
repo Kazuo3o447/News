@@ -6,9 +6,10 @@
 
 ## 1. Projektziel
 
-Ein zentrales Dashboard für IT-Fachkräfte, das Nachrichten aus führenden
-IT- und Microsoft-Quellen aggregiert und via Groq KI in drei Prioritätsstufen
-vorklassifiziert — damit das Wichtigste sofort sichtbar ist.
+Ein zentrales Dashboard für IT-Administratoren, das Nachrichten aus führenden Quellen für
+**Windows/Microsoft**, **Apple (macOS/iOS)** und **Android Enterprise** aggregiert und via
+Groq KI in drei Prioritätsstufen vorklassifiziert — damit das Wichtigste auf jeder Plattform
+sofort sichtbar ist.
 
 ---
 
@@ -39,7 +40,7 @@ vorklassifiziert — damit das Wichtigste sofort sichtbar ist.
 │                          │           │               │   │
 │                          │  ┌────────▼────────────┐  │   │
 │                          │  │  Groq Classifier    │  │   │
-│                          │  │  (llama-3.1-70b)    │  │   │
+│                          │  │  (gpt-oss-120b)     │  │   │
 │                          │  └────────┬────────────┘  │   │
 │                          └───────────┼───────────────┘   │
 │                                      │                   │
@@ -66,37 +67,50 @@ vorklassifiziert — damit das Wichtigste sofort sichtbar ist.
 
 ## 4. RSS Feed-Quellen
 
-### Microsoft-spezifisch
+### Windows / Microsoft (`platform=windows`)
 
 | Quelle | RSS URL | Priorität |
 |---|---|---|
-| Microsoft Tech Community | `https://techcommunity.microsoft.com/rss` | Hoch |
-| Microsoft Security Blog | `https://www.microsoft.com/en-us/security/blog/feed/` | Hoch |
-| Windows Blog | `https://blogs.windows.com/feed/` | Mittel |
+| M365 Message Center | `https://mc.merill.net/rss.xml` | Hoch |
 | Azure Blog | `https://azure.microsoft.com/en-us/blog/feed/` | Hoch |
+| Microsoft Security Blog | `https://www.microsoft.com/en-us/security/blog/feed/` | Hoch |
+| Microsoft Tech Community | `https://techcommunity.microsoft.com/...` | Hoch |
+| Windows Blog | `https://blogs.windows.com/feed/` | Mittel |
 | Microsoft 365 Blog | `https://www.microsoft.com/en-us/microsoft-365/blog/feed/` | Mittel |
-| Windows Central | `https://www.windowscentral.com/rss.xml` | Mittel |
+| MSRC | `https://msrc.microsoft.com/blog/feed/` | Hoch |
 
-### Allgemeine IT-Nachrichten (DE)
-
-| Quelle | RSS URL | Priorität |
-|---|---|---|
-| Heise Online | `https://www.heise.de/rss/heise-atom.xml` | Hoch |
-| Golem.de | `https://rss.golem.de/rss.php?feed=RSS2.0` | Hoch |
-| t3n | `https://t3n.de/rss.xml` | Mittel |
-| Computerwoche | `https://www.computerwoche.de/feed/news` | Mittel |
-| IT-Times | `https://www.it-times.de/rss/news.xml` | Niedrig |
-
-### Allgemeine IT-Nachrichten (EN)
+### Cross-Platform Security & IT (`platform=cross`)
 
 | Quelle | RSS URL | Priorität |
 |---|---|---|
-| Ars Technica | `https://feeds.arstechnica.com/arstechnica/index` | Hoch |
-| The Verge (Tech) | `https://www.theverge.com/rss/index.xml` | Mittel |
-| TechCrunch | `https://techcrunch.com/feed/` | Mittel |
-| ZDNet | `https://www.zdnet.com/news/rss.xml` | Mittel |
-| BleepingComputer | `https://www.bleepingcomputer.com/feed/` | Hoch (Security) |
-| Krebs on Security | `https://krebsonsecurity.com/feed/` | Hoch (Security) |
+| BleepingComputer | `https://www.bleepingcomputer.com/feed/` | Hoch |
+| Krebs on Security | `https://krebsonsecurity.com/feed/` | Hoch |
+| The Hacker News | `https://feeds.feedburner.com/TheHackersNews` | Hoch |
+| Heise Security | `https://www.heise.de/security/rss/news-atom.xml` | Hoch |
+| BSI Warnungen | `https://wid.cert-bund.de/content/public/securityAdvisory/rss` | Hoch |
+| CISA Advisories | `https://www.cisa.gov/cybersecurity-advisories/all.xml` | Hoch |
+| Heise Developer | `https://www.heise.de/developer/rss/news-atom.xml` | Mittel |
+| iX | `https://www.heise.de/ix/news.rdf` | Mittel |
+| Google Workspace Updates | `https://workspaceupdates.googleblog.com/feeds/posts/default` | Mittel |
+
+### Apple / macOS / iOS (`platform=apple`)
+
+| Quelle | RSS URL | Priorität |
+|---|---|---|
+| Jamf Blog | `https://www.jamf.com/blog/rss` | Hoch |
+| Apple Developer Releases | `https://developer.apple.com/news/releases/rss/releases.rss` | Mittel |
+| Intego Mac Security | `https://www.intego.com/mac-security-blog/feed/` | Mittel |
+| Mr. Macintosh | `https://mrmacintosh.com/feed/` | Mittel |
+| Eclectic Light | `https://eclecticlight.co/feed/` | Niedrig |
+
+### Android / Mobile-MDM (`platform=android`)
+
+| Quelle | RSS URL | Priorität |
+|---|---|---|
+| Android Developers | `https://android-developers.googleblog.com/feeds/posts/default` | Mittel |
+| NowSecure | `https://www.nowsecure.com/feed/` | Niedrig |
+| Android Security Bulletin | *(kein RSS — monatlicher Scraper via `android_scraper.py`)* | Hoch |
+| Samsung SMR | *(kein RSS — monatlicher Scraper via `android_scraper.py`)* | Hoch |
 
 ---
 
@@ -109,7 +123,7 @@ vorklassifiziert — damit das Wichtigste sofort sichtbar ist.
 | Framework | FastAPI 0.111+ | Async, schnell, OpenAPI-Docs automatisch |
 | RSS-Parsing | feedparser 6.x | Bewährt, unterstützt Atom + RSS |
 | Scheduler | APScheduler 3.x | Feed-Refresh alle 30 Minuten |
-| KI-Klassifizierung | Groq Python SDK | Schnell, kostengünstig, llama-3.1-70b |
+| KI-Klassifizierung | Groq Python SDK | Schnell, kostengünstig, `openai/gpt-oss-120b` |
 | DB-Client | azure-cosmos 4.x | Offizielles Azure SDK |
 | Runtime | Python 3.12 | Aktuell, Azure App Service support |
 
@@ -138,12 +152,12 @@ vorklassifiziert — damit das Wichtigste sofort sichtbar ist.
 
 | Methode | Pfad | Beschreibung |
 |---|---|---|
-| `GET` | `/api/news` | Alle Artikel (paginiert, filter per Query-Param) |
+| `GET` | `/api/news` | Alle Artikel (filter: `category`, `platform`, `topic`) |
 | `GET` | `/api/news/{id}` | Einzelner Artikel |
-| `GET` | `/api/news?category=KRITISCH` | Gefiltert nach Kategorie |
-| `POST` | `/api/refresh` | Manuelle Feed-Aktualisierung (Auth required) |
+| `POST` | `/api/refresh` | Manuelle Feed-Aktualisierung (`X-Refresh-Secret` Header) |
 | `GET` | `/api/health` | Health-Check Endpunkt |
-| `GET` | `/api/feeds` | Liste aller konfigurierten Feeds |
+| `GET` | `/api/topics` | Klassifizierungsthemen als `{key, label}`-Liste |
+| `GET` | `/api/platforms` | Plattformen als `{key, label}`-Liste |
 
 ---
 
@@ -155,13 +169,14 @@ vorklassifiziert — damit das Wichtigste sofort sichtbar ist.
   "title": "Kritische Sicherheitslücke in Windows 11 entdeckt",
   "summary": "...",
   "url": "https://heise.de/...",
-  "source": "Heise Online",
-  "published_at": "2026-05-27T10:30:00Z",
-  "fetched_at": "2026-05-27T10:35:00Z",
+  "source": "Heise Security",
+  "published_at": "2026-06-03T10:30:00Z",
+  "fetched_at": "2026-06-03T10:35:00Z",
   "category": "KRITISCH",
-  "confidence": 0.94,
-  "classification_reason": "Sicherheitslücke + Patch-Dringlichkeit erkannt",
-  "tags": ["security", "windows", "patch"]
+  "platform": "windows",
+  "confidence": 0.9,
+  "classification_reason": "CVE + aktive Exploitierung erkannt",
+  "tags": ["security", "windows", "cve", "patch"]
 }
 ```
 

@@ -35,54 +35,52 @@ Der Groq-Agent analysiert Headline + Beschreibung jedes eingehenden RSS-Artikels
 ## 2. System-Prompt
 
 ```
-Du bist ein Nachrichtenklassifizierungs-Agent für IT-Fachleute und 
-Microsoft-Administratoren. Deine Aufgabe ist es, News-Headlines und 
-Kurzbeschreibungen in genau eine der folgenden Kategorien einzuordnen:
+Du klassifizierst IT-Admin-News. Antworte AUSSCHLIESSLICH mit JSON.
 
-KRITISCH  — Artikel, die sofortige Aufmerksamkeit erfordern:
-  • Sicherheitslücken, CVEs, Zero-Day-Exploits
-  • Aktive Cyberangriffe oder Datenlecks
-  • Systemausfälle (Azure, Microsoft 365, Windows)
-  • Kritische Patches / Emergency Updates (Patchday, Out-of-Band)
-  • Datenschutzverletzungen mit Unternehmensbezug
-  • Behördliche Notfallwarnungen (BSI, CISA, ENISA)
+KRITISCH = Sofort-Handlungsbedarf auf IRGENDEINER Plattform:
+- Aktiv ausgenutzte Sicherheitslücken / Zero-Days / 0-Days
+- Kritische CVEs (CVSS >= 9.0 oder aktiv in-the-wild)
+- OOB/Notfall-Patches, Rapid Security Response (Apple oder Windows oder Android)
+- Cloud-/Identity-Ausfälle (Entra/M365/Workspace/iCloud für Business)
+- Ransomware-Wellen, aktive Angriffskampagnen
 
-NORMAL    — Reguläre, lesenswerte IT-Nachrichten ohne Dringlichkeit:
-  • Produktankündigungen und Updates
-  • Technologie-Trends und Branchen-Entwicklungen
-  • Microsoft-Roadmap, neue Features, Deprecations
-  • Unternehmens- und Personalentscheidungen
-  • Konferenzberichte, Analysteneinschätzungen
-  • Allgemeine Tutorials und Best Practices
+NORMAL = Admin-relevant, aber nicht eilig:
+- OS-/App-Updates und Feature-Releases (Windows, macOS, iOS, Android Enterprise)
+- MDM-Funktionen (Intune, Jamf, Android Enterprise, Samsung Knox)
+- Security-Research, Threat-Intel (ohne aktive Exploitierung)
+- Compliance (NIS2/DORA), Roadmaps, neue Admin-Tools, Konfigurations-Guides
 
-DUMP      — Kein redaktioneller Wert, ausblenden:
-  • Werbung, gesponserte Inhalte, Affiliate-Links
-  • Produkt-Deals, Rabattaktionen, Black Friday etc.
-  • Click-Bait ohne konkreten IT-Inhalt
-  • Newsletter-Promo, Event-Einladungen
-  • Redundante Pressemitteilungen ohne Neuigkeitswert
-  • Social-Media-Recap-Artikel
+DUMP = Kein Admin-Wert — PLATTFORMUNABHÄNGIG:
+- Consumer-Gerät-Tests/Reviews (auch iOS, macOS, Android – wenn kein Admin-Bezug)
+- Gaming, Krypto, Deals/Werbung, Gerüchte/Hardware-Leaks ohne Security-Relevanz
+- Allgemeiner KI-Hype ohne Enterprise-Bezug
+- Wirtschafts-/Startup-News ohne Security/IT-Admin-Relevanz
+→ WICHTIG: Plattform allein macht KEINEN DUMP.
+  „iOS 18.5 schließt aktiv ausgenutzte Lücke" = KRITISCH/apple
+  „iPhone 17 Testbericht" = DUMP/cross
 
-Antworte AUSSCHLIESSLICH im folgenden JSON-Format, ohne zusätzlichen Text:
-{
-  "category": "KRITISCH" | "NORMAL" | "DUMP",
-  "confidence": <Zahl zwischen 0.0 und 1.0>,
-  "reason": "<Kurze Begründung auf Deutsch, max. 120 Zeichen>"
-}
+platform = woher der Admin-Handlungsbedarf kommt:
+- "windows" = Microsoft (Windows, Azure, M365, Entra, Intune, Exchange, MSRC)
+- "apple"   = Apple (macOS, iOS, iPadOS, Jamf, ABM, Apple MDM, Rapid Security Response)
+- "android" = Android (Android Enterprise, Knox, Samsung SMR, Zero-Touch, NowSecure)
+- "cross"   = betrifft alle Plattformen (M365/Entra, allg. Security, IAM, Cloud-Infra)
+
+Antwortformat für Batch-Anfragen (mehrere Items mit idx):
+{"items":[{"idx":0,"criticality":"KRITISCH"|"NORMAL"|"DUMP","platform":"windows"|"apple"|"android"|"cross","tags":["tag1","tag2"],"reason":"<max 90 Zeichen deutsch>"},...]}
 ```
 
 ---
 
-## 3. User-Prompt Template
+## 3. User-Prompt Template (Batch)
 
 ```
-Analysiere diesen IT-News-Artikel und klassifiziere ihn:
+Klassifiziere folgende {n} IT-News-Artikel als JSON-Batch:
 
-Titel: {title}
-Quelle: {source}
-Beschreibung: {summary}
+0 Titel: "{title_0}" | Quelle: "{source_0}" | Beschreibung: "{summary_0[:300]}"
+1 Titel: "{title_1}" | Quelle: "{source_1}" | Beschreibung: "{summary_1[:300]}"
+...
 
-Antworte nur mit dem JSON-Objekt.
+Antworte mit dem JSON-Batch-Format (items-Array mit idx).
 ```
 
 ---
@@ -91,21 +89,25 @@ Antworte nur mit dem JSON-Objekt.
 
 ### KRITISCH — Beispiele
 
-| Headline | Begründung |
-|---|---|
-| `Kritische RCE-Lücke in Windows Server 2022 (CVE-2026-XXXXX)` | CVE + RCE = sofortiger Handlungsbedarf |
-| `Microsoft Azure AD: Massenausfall in Region West Europe` | Produktionsausfall mit Unternehmensimpakt |
-| `BSI warnt vor aktiver Ausnutzung von Exchange-Schwachstelle` | Behördliche Warnung + aktiver Angriff |
-| `Notfall-Patch KB5040442 für Windows 11 verfügbar` | Out-of-Band Patch = kritisch |
+| Headline | Plattform | Begründung |
+|---|---|---|
+| `Kritische RCE-Lücke in Windows Server 2022 (CVE-2026-XXXXX)` | `windows` | CVE + RCE = sofortiger Handlungsbedarf |
+| `Microsoft Azure AD: Massenausfall in Region West Europe` | `windows` | Produktionsausfall mit Unternehmensimpakt |
+| `BSI warnt vor aktiver Ausnutzung von Exchange-Schwachstelle` | `windows` | Behördliche Warnung + aktiver Angriff |
+| `Notfall-Patch KB5040442 für Windows 11 verfügbar` | `windows` | Out-of-Band Patch = kritisch |
+| `Apple releases Rapid Security Response for actively exploited WebKit flaw` | `apple` | Aktiv ausgenutzte WebKit-Lücke – Apple RSR sofort einspielen |
+| `Android Security Bulletin June 2026: Critical RCE in Bluetooth (CVSS 9.8)` | `android` | Kritische RCE – Patching für verwaltete Android-Geräte priorisieren |
 
 ### NORMAL — Beispiele
 
-| Headline | Begründung |
-|---|---|
-| `Microsoft Copilot erhält neue Sprachfunktionen` | Feature-Update, kein Handlungsbedarf |
-| `Windows 12 Release für Herbst 2026 erwartet` | Roadmap-Information |
-| `Heise: Warum Zero Trust im Mittelstand unterschätzt wird` | Fachartikel, lesenswert |
-| `Azure Cost Management bekommt KI-Empfehlungen` | Produktverbesserung |
+| Headline | Plattform | Begründung |
+|---|---|---|
+| `Microsoft Copilot erhält neue Sprachfunktionen` | `windows` | Feature-Update, kein Handlungsbedarf |
+| `Windows 12 Release für Herbst 2026 erwartet` | `windows` | Roadmap-Information |
+| `Heise: Warum Zero Trust im Mittelstand unterschätzt wird` | `cross` | Fachartikel, lesenswert |
+| `Azure Cost Management bekommt KI-Empfehlungen` | `windows` | Produktverbesserung |
+| `Jamf Pro 11.4: new Declarative Device Management features for macOS` | `apple` | Neues Jamf-Release mit Admin-Funktionen |
+| `Google expands Android Enterprise Zero-Touch Enrollment to new OEM partners` | `android` | Erweiterung des Zero-Touch-Programms |
 
 ### DUMP — Beispiele
 
@@ -115,6 +117,8 @@ Antworte nur mit dem JSON-Objekt.
 | `[Sponsored] Warum Cloud-Backup Ihre Daten rettet` | Gesponsert |
 | `5 Gründe, warum Sie Windows 11 JETZT upgraden sollten` | Click-Bait |
 | `Einladung: Unser Webinar zu Microsoft 365 Security` | Event-Promo |
+| `iPhone 17 Pro: Leaked renders show new titanium design and periscope lens` | Consumer-Hardware-Gerücht, kein Admin-Bezug |
+| `Google Pixel 9a: Hands-on review — Kamera, Akku, Performance` | Consumer-Produkttest, kein Admin-Bezug |
 
 ---
 
@@ -126,34 +130,32 @@ import json
 
 SYSTEM_PROMPT = """..."""  # Siehe Abschnitt 2
 
-def classify_article(title: str, source: str, summary: str) -> dict:
+def classify_batch(items: list[dict]) -> list[dict]:
+    """Klassifiziert 10–12 Artikel in einem Groq-Request."""
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
-    
-    user_prompt = f"""Analysiere diesen IT-News-Artikel:
 
-Titel: {title}
-Quelle: {source}
-Beschreibung: {summary[:500]}
-
-Antworte nur mit dem JSON-Objekt."""
+    lines = [
+        f"{i} Titel: \"{it['title']}\" | Quelle: \"{it['source']}\" "
+        f"| Beschreibung: \"{it.get('summary', '')[:300]}\""
+        for i, it in enumerate(items)
+    ]
+    user_prompt = (
+        f"Klassifiziere folgende {len(items)} IT-News-Artikel als JSON-Batch:\n\n"
+        + "\n".join(lines)
+    )
 
     response = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
+        model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": user_prompt}
         ],
-        temperature=0.1,      # Niedrig für konsistente Klassifizierung
-        max_tokens=150,
+        temperature=0.1,
         response_format={"type": "json_object"}
     )
-    
-    result = json.loads(response.choices[0].message.content)
-    return {
-        "category":   result.get("category", "NORMAL"),
-        "confidence": float(result.get("confidence", 0.5)),
-        "reason":     result.get("reason", "")
-    }
+
+    data = json.loads(response.choices[0].message.content)
+    return data.get("items", [])
 ```
 
 ---
@@ -162,7 +164,7 @@ Antworte nur mit dem JSON-Objekt."""
 
 | Parameter | Wert | Begründung |
 |---|---|---|
-| `model` | `llama-3.1-70b-versatile` | Beste Balance aus Qualität + Geschwindigkeit |
+| `model` | `openai/gpt-oss-120b` | Höhere Qualität bei Cross-Platform-News; via `GROQ_MODEL` Env-Var überschreibbar |
 | `temperature` | `0.1` | Deterministische Klassifizierung |
 | `max_tokens` | `150` | JSON-Antwort ist kurz |
 | `response_format` | `json_object` | Garantiert valides JSON |
@@ -174,8 +176,8 @@ Antworte nur mit dem JSON-Objekt."""
 
 Um Kosten zu optimieren, werden Artikel in Batches klassifiziert:
 
-- **Batch-Größe**: 20 Artikel pro Groq-Request (Multi-Item-Prompt)
-- **Rate Limit**: Groq Free Tier: 30 req/min → Throttling bei Bedarf
+- **Batch-Größe**: 12 Artikel pro Groq-Request (`GROQ_CHUNK_SIZE`)
+- **Rate Limit**: 1.0 s Pause zwischen Batches (`THROTTLE_SECONDS`); Batching reduziert RPM-Verbrauch drastisch
 - **Cache**: Bereits klassifizierte URLs werden nicht erneut verarbeitet
 - **Retry**: Bei API-Fehler: 3 Versuche mit exponential backoff
 
@@ -183,13 +185,15 @@ Um Kosten zu optimieren, werden Artikel in Batches klassifiziert:
 
 ## 8. Qualitätssicherung
 
-### Confidence-Schwellwerte
+### Confidence-Derivation (deterministisch)
 
-| Confidence | Aktion |
+Confidence wird **nicht** vom LLM geliefert, sondern im Scheduler deterministisch berechnet:
+
+| Bedingung | Confidence |
 |---|---|
-| `≥ 0.85` | Kategorie direkt übernehmen |
-| `0.60 – 0.84` | Kategorie übernehmen + in Review-Queue eintragen |
-| `< 0.60` | Als `NORMAL` einstufen (sicherer Fallback) |
+| `forced_critical=True` (CVE / aktiver Exploit / Advisory-Quelle) | `1.0` |
+| Rule-Plattform == LLM-Plattform | `0.9` |
+| Plattform-Mismatch zwischen Regelschicht und LLM | `0.6` |
 
 ### Manuelle Korrekturen
 
