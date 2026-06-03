@@ -2,20 +2,35 @@
 RSS Feed-Fetcher: Liest alle konfigurierten Feeds und gibt normalisierte Artikel zurück.
 """
 import hashlib
+import html
 import logging
+import re
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 
 import feedparser
 
 from config.feeds import FEEDS
 from config.settings import settings
+from services import feed_health
 
 logger = logging.getLogger(__name__)
 
+# HTML-Tag-Muster zum Strippen
+_RE_TAGS = re.compile(r"<[^>]+>")
+# Mehrfach-Whitespace kollabieren
+_RE_WS   = re.compile(r"\s+")
+
+
+def clean_summary(raw: str, max_len: int = 500) -> str:
+    """Entfernt HTML-Tags und -Entities, kollabiert Whitespace, kürzt auf max_len."""
+    text = _RE_TAGS.sub(" ", raw or "")
+    text = html.unescape(text)
+    text = _RE_WS.sub(" ", text).strip()
+    return text[:max_len]
+
 
 def _parse_date(entry) -> str:
-    """Extrahiert ISO-8601-Datum aus einem feedparser-Entry."""
+    """Extrahiert ISO-8601-Datum aus einem feedparser-Entry; Fallback: jetzt (UTC)."""
     for attr in ("published_parsed", "updated_parsed"):
         val = getattr(entry, attr, None)
         if val:
@@ -38,13 +53,14 @@ def fetch_feed(feed_cfg: dict) -> list[dict]:
         parsed = feedparser.parse(url, agent="ITNewsHub/0.1")
         if parsed.bozo and not parsed.entries:
             logger.warning("Feed '%s' returned bozo error: %s", name, parsed.bozo_exception)
+            feed_health.record(name, ok=False)
             return []
 
         articles = []
         for entry in parsed.entries[: settings.MAX_ARTICLES_PER_FEED]:
             link    = getattr(entry, "link", "")
-            title   = getattr(entry, "title", "").strip()
-            summary = getattr(entry, "summary", "").strip()
+            title   = html.unescape(getattr(entry, "title", "").strip())
+            summary = clean_summary(getattr(entry, "summary", ""))
 
             if not link or not title:
                 continue
@@ -52,21 +68,23 @@ def fetch_feed(feed_cfg: dict) -> list[dict]:
             articles.append({
                 "id":           _article_id(link),
                 "title":        title,
-                "summary":      summary[:1000],
+                "summary":      summary,
                 "url":          link,
                 "source":       name,
                 "published_at": _parse_date(entry),
                 "fetched_at":   datetime.now(timezone.utc).isoformat(),
-                # Klassifizierung wird separat durch groq_classifier befüllt
                 "category":     None,
                 "confidence":   None,
                 "reason":       None,
             })
+
+        feed_health.record(name, ok=True)
         logger.info("Fetched %d articles from '%s'", len(articles), name)
         return articles
 
     except Exception as exc:
         logger.error("Error fetching feed '%s': %s", name, exc)
+        feed_health.record(name, ok=False)
         return []
 
 

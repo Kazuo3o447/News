@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, HttpUrl
 
 
-Category = Literal["KRITISCH", "NORMAL", "DUMP", "OFF_TOPIC"]
+Category = Literal["KRITISCH", "NORMAL", "DUMP", "OFF_TOPIC", "PENDING"]
 Platform = Literal["windows", "apple", "android", "cross"]
 
 
@@ -25,31 +25,28 @@ class Article(BaseModel):
 
     # KI-Klassifizierung (None = noch nicht klassifiziert)
     category: Category | None = None
-    platform: Platform | None = None   # NEU: Plattform-Dimension
+    platform: Platform | None = None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     classification_reason: str = ""
     tags: list[str] = []
-    topics: list[str] = []      # Server-seitig erkannte Topic-Keys (security/microsoft/…)
+    topics: list[str] = []
+
+    # Security-Extraktion (Regelschicht)
+    cve_ids: list[str] = []
+    cvss: float | None = None
+
+    # Dedup / Clustering
+    cluster_id: str | None = None
+
+    # Pipeline-Metadaten
+    prompt_version: str = ""
+    tldr: str = ""
 
     def to_cosmos_doc(self) -> dict:
         """Serialisiert den Artikel als Cosmos DB Dokument."""
         doc = self.model_dump()
-        doc["category"] = doc["category"] or "NORMAL"
-        return doc
-
-    @classmethod
-    def from_cosmos_doc(cls, doc: dict) -> "Article":
-        doc.pop("_rid",  None)
-        doc.pop("_self", None)
-        doc.pop("_etag", None)
-        doc.pop("_ts",   None)
-        doc.pop("_attachments", None)
-        return cls(**doc)
-
-    def to_cosmos_doc(self) -> dict:
-        """Serialisiert den Artikel als Cosmos DB Dokument."""
-        doc = self.model_dump()
-        doc["category"] = doc["category"] or "NORMAL"
+        # PENDING ist ehrlicher als NORMAL für noch nicht klassifizierte Artikel
+        doc["category"] = doc["category"] or "PENDING"
         return doc
 
     @classmethod

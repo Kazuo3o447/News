@@ -89,19 +89,27 @@ def apply_rules(title: str, summary: str, source: str) -> dict:
             "forced_critical": bool,
             "platform_hint":   str | None,   # aus Source-Map; None wenn unbekannte Quelle
             "signals":         list[str],    # ausgelöste Regel-Signale (für Logging)
+            "cve_ids":         list[str],    # alle gefundenen CVE-IDs (uppercase, dedupliziert)
+            "cvss":            float | None, # höchster gefundener CVSS-Wert
         }
     """
     text_lower = f" {(title or '').lower()} {(summary or '').lower()} "
     signals: list[str] = []
 
-    # --- Regel 1: CVE-ID im Text ---
-    if _RE_CVE.search(text_lower):
+    # --- Regel 1: CVE-IDs extrahieren ---
+    cve_matches = _RE_CVE.findall(text_lower)
+    cve_ids: list[str] = sorted({m.upper() for m in cve_matches})
+    if cve_ids:
         signals.append("cve")
 
-    # --- Regel 2: Kritischer CVSS-Wert (>= 9.0) ---
+    # --- Regel 2: Höchsten CVSS-Wert extrahieren ---
+    cvss: float | None = None
     for match in _RE_CVSS.finditer(text_lower):
         try:
-            if float(match.group(1)) >= 9.0:
+            val = float(match.group(1))
+            if cvss is None or val > cvss:
+                cvss = val
+            if val >= 9.0:
                 signals.append("cvss_critical")
                 break
         except ValueError:
@@ -133,4 +141,6 @@ def apply_rules(title: str, summary: str, source: str) -> dict:
         "forced_critical": len(signals) > 0,
         "platform_hint":   platform_hint,
         "signals":         signals,
+        "cve_ids":         cve_ids,
+        "cvss":            cvss,
     }

@@ -14,8 +14,8 @@ def _fake_parse(url, agent=None):
         entries=[
             types.SimpleNamespace(
                 link="https://example.com/article-1",
-                title="Kritische Lücke in Windows 11",
-                summary="Eine neue Schwachstelle wurde entdeckt.",
+                title="Kritische Lücke in Windows 11 &amp; Windows 10",
+                summary="<p>Eine <b>neue</b> &amp; kritische Schwachstelle wurde entdeckt.</p>",
                 published_parsed=(2026, 5, 27, 10, 0, 0, 0, 0, 0),
                 updated_parsed=None,
             )
@@ -43,11 +43,18 @@ def test_fetch_feed_article_fields():
     feed = {"name": "Test Feed", "url": "https://example.com/rss", "priority": "high"}
     articles = fetch_feed(feed)
     a = articles[0]
-    assert a["title"]   == "Kritische Lücke in Windows 11"
+    # HTML-Entities im Titel müssen aufgelöst werden
+    assert a["title"]   == "Kritische Lücke in Windows 11 & Windows 10"
     assert a["source"]  == "Test Feed"
     assert a["url"]     == "https://example.com/article-1"
     assert a["id"]                     # SHA-256 Hash vorhanden
     assert a["category"] is None       # Noch nicht klassifiziert
+    # Summary muss HTML-frei und entity-aufgelöst sein
+    assert "<" not in a["summary"]
+    assert ">" not in a["summary"]
+    assert "&amp;" not in a["summary"]
+    assert "neue" in a["summary"]
+    assert "kritische" in a["summary"]
 
 
 def test_fetch_feed_empty_on_error():

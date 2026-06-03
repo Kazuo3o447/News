@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     # Fallback-Plattform wenn weder LLM noch Regelschicht einen Wert liefern
     DEFAULT_PLATFORM: str = "cross"
 
+    # Prompt-Versionierung — bei jeder relevanten Prompt-Änderung hochzählen
+    PROMPT_VERSION: str = "2025-06-01"
+    # Zeitfenster für Dedup/Clustering in Stunden
+    DEDUP_WINDOW_HOURS: int = 72
+    # Teams-Webhook für KRITISCH-Push; leer = Push deaktiviert (No-op)
+    TEAMS_WEBHOOK_URL: str = ""
+    # TL;DR für KRITISCH-Artikel (kostet Tokens); standardmäßig deaktiviert
+    ENABLE_CRITICAL_TLDR: bool = False
+
     class Config:
         env_file = ".env"
 

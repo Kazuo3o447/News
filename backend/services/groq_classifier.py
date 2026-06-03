@@ -98,9 +98,10 @@ def classify_batch(items: list[dict]) -> list[dict]:
     items = [{"idx": int, "title": str, "source": str, "summary": str}, ...]
 
     Rückgabe: Liste in gleicher Reihenfolge wie items, jedes Element:
-        {"idx": int, "criticality": str, "platform": str, "tags": list[str], "reason": str}
+        {"idx": int, "criticality": str, "platform": str, "tags": list[str], "reason": str, "tldr": str}
 
     confidence wird NICHT vom LLM erwartet — der Scheduler leitet sie deterministisch ab.
+    Wenn settings.ENABLE_CRITICAL_TLDR True: KRITISCH-Items erhalten zusätzlich "tldr" (max 140 Z.).
     """
     client = _get_client()
     if client is None:
@@ -108,7 +109,7 @@ def classify_batch(items: list[dict]) -> list[dict]:
         return [
             {
                 "idx": item["idx"], "criticality": "NORMAL", "platform": "cross",
-                "tags": [], "reason": "Kein Groq API-Key konfiguriert",
+                "tags": [], "reason": "Kein Groq API-Key konfiguriert", "tldr": "",
             }
             for item in items
         ]
@@ -122,8 +123,13 @@ def classify_batch(items: list[dict]) -> list[dict]:
             f"    Titel: {item['title']}\n"
             f"    Summary: {summary}"
         )
+
+    tldr_instruction = (
+        ' Für KRITISCH-Items zusätzlich "tldr": "<max 140 Zeichen, was zu tun ist>".'
+        if settings.ENABLE_CRITICAL_TLDR else ""
+    )
     user_prompt = (
-        'Klassifiziere folgende Artikel als Batch. Antworte mit {"items":[...]}:\n\n'
+        f'Klassifiziere folgende Artikel als Batch. Antworte mit {{"items":[...]}}.{tldr_instruction}\n\n'
         + "\n\n".join(lines)
     )
 
@@ -161,6 +167,7 @@ def classify_batch(items: list[dict]) -> list[dict]:
                     "platform":    platform,
                     "tags":        tags,
                     "reason":      str(entry.get("reason", ""))[:120],
+                    "tldr":        str(entry.get("tldr", ""))[:140],
                 }
 
             # Fehlende Items mit Fallback auffüllen
@@ -172,10 +179,11 @@ def classify_batch(items: list[dict]) -> list[dict]:
                     logger.warning("Batch: kein LLM-Ergebnis für idx=%d — Fallback", item["idx"])
                     output.append({
                         "idx":         item["idx"],
-                        "criticality": "NORMAL",
+                        "criticality": "PENDING",  # ehrlicher als NORMAL: wird im nächsten Lauf nochmal versucht
                         "platform":    "cross",
                         "tags":        [],
                         "reason":      "Fallback: kein LLM-Ergebnis",
+                        "tldr":        "",
                     })
             return output
 
@@ -183,11 +191,11 @@ def classify_batch(items: list[dict]) -> list[dict]:
             logger.warning("Groq batch attempt %d failed: %s", attempt + 1, exc)
             time.sleep(2 ** attempt)   # exponential backoff: 1s, 2s, 4s
 
-    logger.error("Groq batch classification failed after 3 attempts — NORMAL fallback")
+    logger.error("Groq batch classification failed after 3 attempts — PENDING fallback")
     return [
         {
-            "idx": item["idx"], "criticality": "NORMAL", "platform": "cross",
-            "tags": [], "reason": "Klassifizierung fehlgeschlagen",
+            "idx": item["idx"], "criticality": "PENDING", "platform": "cross",
+            "tags": [], "reason": "Klassifizierung fehlgeschlagen nach 3 Versuchen", "tldr": "",
         }
         for item in items
     ]
