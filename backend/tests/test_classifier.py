@@ -22,11 +22,17 @@ class _FakeClient:
         self.completions = self
 
     def create(self, **kwargs):
-        # Simuliert eine KRITISCH-Antwort
+        # Simuliert eine KRITISCH-Antwort im neuen Batch-Format
         return _FakeCompletion(json.dumps({
-            "category": "KRITISCH",
-            "confidence": 0.95,
-            "reason": "Sicherheitslücke erkannt",
+            "items": [
+                {
+                    "idx": 0,
+                    "criticality": "KRITISCH",
+                    "platform": "windows",
+                    "tags": ["rce", "windows"],
+                    "reason": "Sicherheitslücke erkannt",
+                }
+            ]
         }))
 
 groq_stub.Groq = _FakeClient
@@ -35,7 +41,7 @@ sys.modules["groq"] = groq_stub
 # Settings-Stub
 import os
 os.environ.setdefault("GROQ_API_KEY", "test-key")
-os.environ.setdefault("GROQ_MODEL",   "llama-3.1-70b-versatile")
+os.environ.setdefault("GROQ_MODEL",   "openai/gpt-oss-120b")
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -55,23 +61,17 @@ def test_classify_category_valid():
     assert result["category"] in ("KRITISCH", "NORMAL", "DUMP")
 
 
-def test_classify_confidence_range():
+def test_classify_confidence_is_none():
+    """confidence wird nicht mehr vom LLM bestimmt, sondern im Scheduler abgeleitet."""
     result = classify_article("Windows RCE-Lücke", "Heise", "Kritische Sicherheitslücke entdeckt")
-    assert 0.0 <= result["confidence"] <= 1.0
+    assert result["confidence"] is None
 
 
-def test_classify_fallback_on_low_confidence(monkeypatch):
-    """Confidence < 0.60 → Kategorie wird auf NORMAL gesetzt."""
-    def fake_create(**kwargs):
-        return _FakeCompletion(json.dumps({
-            "category": "KRITISCH",
-            "confidence": 0.3,
-            "reason": "Unsicher",
-        }))
+def test_classify_returns_platform():
+    result = classify_article("Windows RCE-Lücke", "Heise", "Kritische Sicherheitslücke entdeckt")
+    assert result.get("platform") in ("windows", "apple", "android", "cross")
 
-    import services.groq_classifier as mod
-    monkeypatch.setattr(mod._get_client().chat.completions, "create", fake_create)
-    # Neuen Client erzwingen
-    mod._client = None
-    result = classify_article("Test", "Test", "Test")
-    assert result["category"] == "NORMAL"
+
+def test_classify_returns_tags():
+    result = classify_article("Windows RCE-Lücke", "Heise", "Kritische Sicherheitslücke entdeckt")
+    assert isinstance(result.get("tags"), list)

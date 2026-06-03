@@ -1,19 +1,34 @@
 # Agent — Groq KI-Klassifizierung
 
-> Groq API · Modell: `llama-3.1-70b-versatile` · Stand: Mai 2026
+> Groq API · Modell: `openai/gpt-oss-120b` · Stand: Juni 2026 (Copilot-Brief 01)
 
 ---
 
 ## 1. Aufgabe des Agents
 
-Der Groq-Agent analysiert Headline + Beschreibung jedes eingehenden
-RSS-Artikels und ordnet ihn einer von drei Kategorien zu:
+Der Groq-Agent analysiert Headline + Beschreibung jedes eingehenden RSS-Artikels
+(**Batch: 12 Artikel pro Request**) und ordnet jeden Artikel zwei Achsen zu:
+
+| Achse | Werte |
+|---|---|
+| **Kritikalität** | `KRITISCH` / `NORMAL` / `DUMP` |
+| **Plattform** | `windows` / `apple` / `android` / `cross` |
 
 | Kategorie | Symbol | Bedeutung |
 |---|---|---|
-| `KRITISCH` | 🔴 | Sofortiger Handlungsbedarf — Security, Outages, kritische Patches |
-| `NORMAL` | 🔵 | Reguläre IT-Neuigkeit — lesenswert, kein Handlungsbedarf |
-| `DUMP` | ⚫ | Werbung, Spam, Clickbait, Sponsored Content — ausblenden |
+| `KRITISCH` | 🔴 | Sofortiger Handlungsbedarf auf **irgendeiner** Plattform |
+| `NORMAL` | 🔵 | Admin-relevant, kein Sofortbedarf |
+| `DUMP` | ⚫ | Kein Admin-Wert — plattformunabhängig (Consumer-Reviews, Gaming, Deals …) |
+
+> **DUMP ist plattformunabhängig.** Ein Apple-Artikel ist NICHT DUMP weil er Apple betrifft.
+> Er ist DUMP wenn er keinen Admin-Wert hat (z. B. „iPhone 17 Testbericht").
+
+### Vorgelagerte Stufen (LLM-Bypass)
+
+| Stufe | Was passiert |
+|---|---|
+| **Pre-Filter** | Denylist-Treffer → sofort `OFF_TOPIC`, kein LLM-Call |
+| **Regelschicht** | CVE / aktiver Exploit / Advisory-Quelle → `forced_critical=True` |
 
 ---
 

@@ -1,22 +1,35 @@
 # Projektstatus — IT News Hub
 
-> Letzte Aktualisierung: Mai 2026
+> Letzte Aktualisierung: Juni 2026 (Copilot-Brief 01 — Cross-Platform-Umbau)
 
 ---
 
 ## Gesamtfortschritt
 
 ```
-Infrastruktur  ░░░░░░░░░░  0 %
-Backend        ░░░░░░░░░░  0 %
-Frontend       ░░░░░░░░░░  0 %
-KI / Groq      ░░░░░░░░░░  0 %
-Deployment     ░░░░░░░░░░  0 %
+Infrastruktur  ████░░░░░░  40 %
+Backend        ███████░░░  70 %
+Frontend       ████░░░░░░  40 %
+KI / Groq      ████████░░  80 %
+Deployment     ░░░░░░░░░░   0 %
 ```
 
 ---
 
-## Phase 1 — Projektaufbau ✅
+## Copilot-Brief 01 — Backend & KI-Pipeline ✅ Abgeschlossen (Juni 2026)
+
+- [x] `config/feeds.py`: platform-Feld + Apple/Android-Feeds (Jamf, Intego, Mr. Macintosh, Eclectic Light, Android Developers, Google Workspace, NowSecure)
+- [x] `api/models/article.py`: `platform: Platform | None` als neues Feld
+- [x] `config/settings.py`: GROQ_MODEL → `openai/gpt-oss-120b`, neue Felder REFRESH_SECRET / HALO_TICKET_BASE_URL / DEFAULT_PLATFORM
+- [x] `services/topics.py`: PLATFORMS-Liste + platform_label() — Single Source of Truth
+- [x] `api/routes/news.py`: GET /api/topics + GET /api/platforms; platform-Filter; OFF_TOPIC; POST /api/refresh Auth via X-Refresh-Secret
+- [x] `services/pre_filter.py`: Apple/Android-Keywords in ALLOWLIST; `autopilot` aus DENYLIST (kollidiert mit Windows Autopilot); platform_hint-Feld im Rückgabe-Dict
+- [x] `services/rule_classifier.py` **NEU**: Deterministische Schicht (CVE / CVSS / aktiver Exploit / Advisory-Quelle → forced_critical); Source→Platform-Map
+- [x] `tests/test_rule_classifier.py` **NEU**: ~25 Unit-Tests
+- [x] `services/groq_classifier.py`: Cross-Platform-Prompt; classify_batch() (12 Artikel/Request); classify_article() als Wrapper; Modell via settings.GROQ_MODEL
+- [x] `services/scheduler.py`: Pipeline vollständig verdrahtet (Pre-Filter → Regelschicht → Groq-Batch → Merge → Cosmos); THROTTLE 6s→1s; Bug 1+2 behoben
+- [x] `services/android_scraper.py` **NEU**: Monatlicher Scraper für Android Security Bulletin + Samsung SMR (kein RSS)
+- [x] `.env.example` aktualisiert
 
 - [x] Konzept & Architektur definiert
 - [x] Ordnerstruktur angelegt

@@ -1,6 +1,7 @@
 """
 Server-seitige Topic-Erkennung anhand Keywords in Titel + Summary.
-Spiegelt frontend/src/utils/topics.js — Single source of truth liegt hier.
+Single Source of Truth für Topics und Plattform-Labels.
+Das Frontend soll diese Daten per GET /api/topics und GET /api/platforms laden.
 """
 from __future__ import annotations
 
@@ -46,7 +47,16 @@ TOPICS: list[dict] = [
     ]},
 ]
 
-_TOPIC_LOOKUP = {t["key"]: t for t in TOPICS}
+# Plattform-Dimension — eigene Achse, kein Topic
+PLATFORMS: list[dict] = [
+    {"key": "windows", "label": "Windows / Microsoft"},
+    {"key": "apple",   "label": "Apple / macOS / iOS"},
+    {"key": "android", "label": "Android / Mobile-MDM"},
+    {"key": "cross",   "label": "Plattformübergreifend"},
+]
+
+_TOPIC_LOOKUP    = {t["key"]: t for t in TOPICS}
+_PLATFORM_LOOKUP = {p["key"]: p for p in PLATFORMS}
 
 
 def detect_topics(title: str, summary: str = "") -> list[str]:
@@ -61,3 +71,7 @@ def detect_topics(title: str, summary: str = "") -> list[str]:
 
 def topic_label(key: str) -> str:
     return _TOPIC_LOOKUP.get(key, {}).get("label", key)
+
+
+def platform_label(key: str) -> str:
+    return _PLATFORM_LOOKUP.get(key, {}).get("label", key)
